@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宥朋養生推拿 測試站 v0.2</title>
+<style>
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;background:#F7F3EE;color:#352A24}
+a{text-decoration:none}
+.hero{padding:24px 14px 10px;background:#F7F3EE}
+.hero-inner{max-width:560px;margin:0 auto;background:#FFFDFB;border:1px solid #E5D9CC;border-radius:18px;padding:18px}
+.badge{display:inline-block;background:#EFE4D7;color:#5A463B;border:1px solid #D8C7B8;border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700}
+.test-label{display:inline-block;background:#A94438;color:#fff;border-radius:999px;padding:5px 10px;font-size:13px;font-weight:900;margin:10px 0 6px}
+h1{font-size:32px;margin:6px 0 8px;color:#352A24}
+.tagline{font-size:18px;margin:0 0 18px;color:#6A5950}
+.hero-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hero-actions .btn:first-child{grid-column:1/-1}
+main{max-width:560px;margin:0 auto;padding:14px 14px 70px}
+.card{background:#FFFDFB;border:1px solid #E5D9CC;border-radius:14px;padding:18px;margin-bottom:14px}
+h2{font-size:20px;margin:0 0 12px}
+h3{font-size:16px;margin:16px 0 8px}
+label{display:block;margin:12px 0 6px;font-weight:800}
+input,select,textarea{width:100%;border:1px solid #D4C4B3;border-radius:12px;padding:12px;font-size:16px;background:#fff}
+textarea{min-height:78px;resize:vertical}
+button,.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px 16px;font-size:16px;font-weight:900;margin-top:10px;background:#A94438;color:#fff;text-align:center;cursor:pointer}
+button.secondary,.btn.secondary{background:#F2E8DD;color:#352A24;border:1px solid #D4C4B3}
+button.ghost,.btn.ghost{background:#fff;color:#352A24;border:1px solid #B7A69A}
+button.danger{background:#93352c}
+button.small{width:auto;padding:8px 11px;font-size:13px;margin:5px 4px 0 0;border-radius:999px}
+.hidden{display:none!important}
+.muted{color:#6A5950;font-size:14px;line-height:1.6}
+.info{background:#FBFAF8;border:1px solid #E5DED7;border-radius:12px;padding:12px;margin:8px 0;line-height:1.6}
+.notice{background:#FFF6D8;border:1px solid #ECD98E;color:#5D4711;padding:12px;border-radius:12px;font-size:14px;line-height:1.6;margin-top:10px}
+.success{background:#EDF9EF;border:1px solid #A8D8B0;color:#214A27;padding:14px;border-radius:12px;line-height:1.8;margin-top:12px}
+.price-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px dashed #E5D5C5;font-size:16px}
+.price-row:last-child{border-bottom:0}
+.price-row b{white-space:nowrap}
+.service{border:1px solid #E5DED7;border-radius:14px;padding:13px;margin:9px 0;background:#FBFAF8}
+.service input[type=checkbox]{width:auto}
+.chip{display:inline-block;padding:4px 9px;border-radius:999px;background:#EFE4D7;color:#5A463B;font-size:12px;margin:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.slot{border:1px solid #CDB9A3;border-radius:12px;padding:10px 5px;text-align:center;background:#fff;cursor:pointer;font-size:13px;line-height:1.35}
+.slot.sel{background:#A94438;color:#fff;border-color:#A94438}
+.slot.disabled{background:#eee;color:#999;border-color:#ddd;cursor:not-allowed;text-decoration:line-through}
+.part-checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.part-check{display:flex;align-items:center;gap:6px;padding:9px 10px;border:1px solid #E5DED7;border-radius:12px;background:#fff;font-size:14px;font-weight:700}
+.part-check input{width:auto;margin:0}
+.appt{border-left:5px solid #A94438;background:#FBFAF8;padding:11px;border-radius:12px;margin:9px 0;line-height:1.65}
+.appt.block{border-left-color:#B6782E}
+.appt .t{font-weight:900}
+footer{max-width:560px;margin:0 auto;padding:20px 14px 34px;text-align:center;color:#9B8C7D;font-size:12px}
+footer a{color:#9B8C7D;margin-left:8px;font-size:12px}
+.float-call{position:fixed;right:16px;bottom:18px;width:58px;height:58px;border-radius:50%;background:#A94438;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 18px rgba(0,0,0,.18);z-index:20}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+.modal-card{background:#fff;border-radius:18px;padding:18px;max-width:360px;width:100%}
+.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.test-banner{max-width:560px;margin:12px auto 0;padding:10px 14px;background:#FFF3CD;color:#5B4300;border:1px solid #EAD27B;border-radius:12px;font-size:14px;line-height:1.5}
+.contact-more summary{cursor:pointer;font-weight:900;color:#5B463A;padding:10px 0 4px}
+.contact-actions{display:grid;gap:8px;margin-top:10px}
+.contact-actions a{display:block;text-align:center;border-radius:12px;padding:12px;font-weight:900;color:#352A24;border:1px solid #D4C4B3;background:#fff}
+.login-shell{min-height:100vh;background:#F7F3EE;display:flex;align-items:center;justify-content:center;padding:18px}
+.login-shell .card{width:100%;max-width:420px}
+.admin-shell{min-height:100vh;background:#F7F3EE;padding:14px}
+.admin-header{max-width:560px;margin:0 auto 14px;background:#352A24;color:#fff;border-radius:18px;padding:18px}
+.admin-header h1{color:#fff;font-size:24px;margin:0 0 6px}
+.admin-header p{margin:0;color:#E8DDD5;font-size:14px}
+.admin-actions{max-width:560px;margin:0 auto 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.admin-page .card{max-width:560px;margin-left:auto;margin-right:auto}
+body.admin-mode .hero,body.admin-mode main > section:not(#login):not(#admin),body.admin-mode .float-call,body.admin-mode footer{display:none!important}
+body.admin-mode main{max-width:none;padding:0}
+@media(max-width:380px){.part-checks,.row2{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+
+<style>
+.appt.done{
+  opacity:.55;
+  background:#eeeeee!important;
+  border-left-color:#999!important;
+  color:#666;
+}
+.appt.done .done-label{
+  display:inline-block;
+  background:#777;
+  color:#fff;
+  border-radius:999px;
+  padding:3px 9px;
+  font-size:12px;
+  font-weight:900;
+  margin-left:6px;
+}
+</style>
+
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-inner">
+    <span class="badge">新莊・中誠街57號</span><br>
+    <span class="test-label">測試版</span>
+    <h1>宥朋養生推拿</h1>
+    <p class="tagline">專業推拿・放鬆舒壓</p>
+    <div class="hero-actions">
+      <a class="btn" href="#booking">立即預約</a>
+      <a class="btn secondary" href="#" onclick="openCall(event)">撥打電話</a>
+      <a class="btn secondary" href="https://maps.app.goo.gl/8Anoo9XYUwxBuvbz8" target="_blank">導航到店</a>
+    </div>
+  </div>
+</section>
+
+<div class="test-banner"><b>測試版</b>：目前此網站仍在開發與試用中，功能、價格與預約流程都還可能調整，尚未正式對外使用。</div>
+
+<main>
+<section class="card">
+  <h2>店家資訊</h2>
+  <div class="info">📍 新北市新莊區中誠街57號</div>
+  <div class="info">
+☎️ 店內電話：02-2996-5798
+<details class="contact-more" style="margin-top:8px">
+<summary>查看更多聯絡方式</summary>
+<div class="info">老闆：0958-133-798</div>
+<div class="info">老闆娘：0953-133-798</div>
+<div class="contact-actions">
+<a href="tel:0958133798">撥打老闆電話</a>
+<a href="tel:0953133798">撥打老闆娘電話</a>
+</div>
+</details>
+</div>
+  <div class="info">🕙 營業時間：10:00～22:00</div>
+</section>
+
+<section id="customer">
+  <div class="card">
+    <h2>查詢我的預約</h2>
+    <p class="muted">輸入預約時留下的電話，即可查看自己的預約。</p>
+    <label>電話</label>
+    <input id="lookupPhone" placeholder="請輸入預約電話">
+    <button class="secondary" onclick="lookup()">查詢預約</button>
+    <div id="lookupBox"></div>
+  </div>
+
+  <div class="card" id="booking">
+    <h2>預約</h2>
+
+    <label>1. 選日期</label>
+    <input type="date" id="dateInput">
+
+    <h3>2. 選服務（可複選）</h3>
+    <div id="services"></div>
+
+    <label>3. 選按摩師</label>
+    <select id="staffInput">
+      <option value="any">不限（最快）</option>
+      <option value="boss">老闆</option>
+      <option value="lady">老闆娘</option>
+    </select>
+
+    <button onclick="calcSlots()">查看可預約時間</button>
+    <div id="totalBox" class="notice hidden"></div>
+
+    <h3 id="slotTitle" class="hidden">4. 選可預約時段</h3>
+    <div id="slots" class="grid"></div>
+
+    <h3>5. 填資料</h3>
+    <div class="row2">
+      <div>
+        <label>姓氏</label>
+        <input id="surname" placeholder="王">
+      </div>
+      <div>
+        <label>稱謂</label>
+        <select id="title"><option>先生</option><option>小姐</option></select>
+      </div>
+    </div>
+
+    <label>電話（必填）</label>
+    <input id="phone" placeholder="請填可聯絡電話">
+
+    <label>備註（選填）</label>
+    <textarea id="note" placeholder="例如：第一次來、想加強肩頸、力道希望輕一點"></textarea>
+
+    <button onclick="preview()">確認預約內容</button>
+    <div id="previewBox" class="notice hidden"></div>
+
+    <button onclick="submitBooking()">送出預約</button>
+    <div id="successBox" class="success hidden"></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>價目表</h2>
+  <div class="price-row"><span>修指甲（手）</span><b>NT$100</b></div>
+  <div class="price-row"><span>修指甲（腳）</span><b>NT$200</b></div>
+  <div class="price-row"><span>修腳皮</span><b>NT$500</b></div>
+  <div class="price-row"><span>修凍甲</span><b>NT$200</b></div>
+  <div class="price-row"><span>刮痧</span><b>NT$500</b></div>
+  <div class="price-row"><span>肩頸放鬆 15 分鐘</span><b>NT$200</b></div>
+  <div class="price-row"><span>腳底按摩 45 分鐘</span><b>NT$600</b></div>
+  <div class="price-row"><span>全身按摩 60 分鐘</span><b>NT$800</b></div>
+  <div class="price-row"><span>痠痛推拿 60 分鐘<br><small class="muted">可複選想針對處理項目</small></span><b>NT$800</b></div>
+  <div class="price-row"><span>指油壓 60 分鐘起<br><small class="muted">90、120 分鐘皆推薦</small></span><b>NT$800</b></div>
+  <div class="price-row"><span>精油指油壓 60 分鐘起<br><small class="muted">90、120 分鐘皆推薦；自備精油另計</small></span><b>NT$1000</b></div>
+  <p class="muted">按摩類服務加 15 分鐘加 NT$200。精油指油壓若自備精油，60 分鐘 NT$800。</p>
+</section>
+
+<section id="login" class="hidden login-shell">
+  <div class="card">
+    <h2>宥朋店家後台登入</h2>
+    <p class="muted">測試版帳號：admin　密碼：1234</p>
+    <label>帳號</label><input id="adminUser">
+    <label>密碼</label><input id="adminPass" type="password">
+    <label style="display:flex;gap:8px;align-items:center"><input id="remember" type="checkbox" checked style="width:auto">保持登入，下次直接查看後台</label>
+    <button onclick="login()">登入後台</button>
+    <button class="ghost" onclick="showCustomer()">回到客人網站</button>
+  </div>
+</section>
+
+<section id="admin" class="hidden admin-page">
+  <div class="admin-shell">
+    <div class="admin-header">
+      <h1>宥朋店家後台</h1>
+      <p>測試版｜登入後只顯示店家管理功能</p>
+    </div>
+    <div class="admin-actions">
+      <button class="secondary" onclick="showCustomer()">回到客人網站</button>
+      <button class="danger" onclick="logout()">登出</button>
+    </div>
+
+    <div class="card">
+      <h2>預約清單</h2>
+      <label>查看日期</label>
+      <input type="date" id="adminDate" onchange="renderAdmin()">
+      <div id="adminList"></div>
+    </div>
+
+    
+    
+    <div class="card">
+      <h2>今日營業時間設定</h2>
+      <p class="muted">依照上方「查看日期」設定。設定後，客人端該日期的可預約時間會跟著改變。</p>
+      <div id="hoursStatus" class="info"></div>
+
+      <button class="ghost" onclick="setNormalHours()">恢復正常營業 10:00～22:00</button>
+
+      <label>提早打烊時間</label>
+      <input type="time" id="earlyCloseTime" step="900" value="18:00">
+      <button onclick="setEarlyClose()">設定提早打烊</button>
+
+      <label>延後打烊時間</label>
+      <input type="time" id="lateCloseTime" step="900" value="23:00">
+      <button onclick="setLateClose()">設定延後打烊</button>
+    </div>
+
+<div class="card">
+      <h2>營業額紀錄</h2>
+      <p class="muted">依照上方「查看日期」統計。預約與現場客會計入營業額；預留時間不計入。</p>
+      <div id="revenueBox" class="info"></div>
+      <h3>當日明細</h3>
+      <div id="revenueList"></div>
+    </div>
+
+<div class="card">
+      <h2>新增現場客／預留時間</h2>
+      <label>類型</label>
+      <select id="manualType"><option value="walkin">現場客</option><option value="block">預留時間</option></select>
+      <label>日期</label><input type="date" id="manualDate">
+      <label>人員</label><select id="manualStaff"><option value="boss">老闆</option><option value="lady">老闆娘</option></select>
+      <div class="row2">
+        <div><label>開始時間</label><input type="time" id="manualStart" step="900"></div>
+        <div><label>時間長度</label><select id="manualDur"><option value="30">30分</option><option value="45">45分</option><option value="60">60分</option><option value="90">90分</option><option value="120">120分</option></select></div>
+      </div>
+      <label>服務／原因</label>
+      <input id="manualService" placeholder="例如：腳底按摩、吃飯、外出">
+      <label>金額（現場客才需要填）</label>
+      <input id="manualPrice" type="number" min="0" step="50" placeholder="例如：800；預留時間可留空">
+      <button onclick="addManual()">新增並鎖定時段</button>
+    </div>
+
+    <div class="card">
+      <h2>後台設定</h2>
+      <label>Buffer 緩衝時間</label>
+      <select id="buffer" onchange="saveBuffer()">
+        <option value="0">0分鐘</option><option value="5">5分鐘</option><option value="10">10分鐘</option><option value="15">15分鐘</option><option value="20">20分鐘</option>
+      </select>
+      <button class="ghost" onclick="seed(true)">重置 Demo 假資料</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<a class="float-call" href="#" onclick="openCall(event)">☎</a>
+<div id="callModal" class="modal hidden">
+  <div class="modal-card">
+    <h2>撥打電話？</h2>
+    <p>是否撥打宥朋養生推拿店內電話<br><b>02-2996-5798</b></p>
+    <div class="modal-actions">
+      <button class="ghost" onclick="closeCall()">取消</button>
+      <a class="btn" href="tel:0229965798">撥打</a>
+    </div>
+  </div>
+</div>
+
+<footer>© 宥朋養生推拿 <a href="#" onclick="goAdmin(event)">管理</a></footer>
+
+<script>
+const staffName={boss:"老闆",lady:"老闆娘",any:"不限"};
+
+const painItems=[
+"頭痛","睡眠障礙","腰酸背痛","頸椎夾窄","肩頸痠痛","肩關節周圍炎（五十肩）","肌腱炎",
+"脊椎側彎","S 型脊椎","腰椎間盤突出","僵直性脊椎炎","椎體滑脫",
+"網球肘","媽媽手","電腦手","手臂酸麻痛","扳機指","手腕酸痛",
+"膝蓋酸痛無力","腳踝扭傷","足底筋膜炎","跟腱炎","手腳冰冷無力","現場由師傅評估"
+];
+
+const servicesDef=[
+{id:"handnail",name:"修指甲（手）",staff:["lady"],type:"fixed",fixed:30,base:100,baseDur:30},
+{id:"footnail",name:"修指甲（腳）",staff:["lady"],type:"fixed",fixed:45,base:200,baseDur:45},
+{id:"callus",name:"修腳皮",staff:["lady"],type:"level",levels:[["輕微",30],["一般（推薦）",45],["嚴重",60]],rec:45,base:500},
+{id:"ingrown",name:"修凍甲",staff:["lady"],type:"level",levels:[["輕微",30],["一般（推薦）",45],["嚴重",60]],rec:45,base:200},
+{id:"gua",name:"刮痧",staff:["boss","lady"],type:"fixed",fixed:60,label:"刮痧依出痧狀況而不同，系統先預留 60 分鐘。",base:500,baseDur:60},
+{id:"neck",name:"肩頸放鬆",staff:["boss","lady"],type:"free",opts:[15,30,45,60],rec:30,base:200,baseDur:15},
+{id:"foot",name:"腳底按摩",staff:["boss","lady"],type:"free",opts:[45,60,75,90,105,120],rec:60,base:600,baseDur:45},
+{id:"body",name:"全身按摩",staff:["boss","lady"],type:"free",opts:[60,75,90,105,120],rec:60,base:800,baseDur:60},
+{id:"pain",name:"痠痛推拿",staff:["boss"],type:"free",opts:[60,75,90,105,120],rec:60,base:800,baseDur:60,parts:painItems},
+{id:"oil",name:"指油壓",staff:["boss","lady"],type:"free",opts:[60,75,90,105,120],rec:90,base:800,baseDur:60,recommended:[90,120]},
+{id:"aroma",name:"精油指油壓",staff:["boss","lady"],type:"free",opts:[60,75,90,105,120],rec:90,base:1000,baseDur:60,recommended:[90,120],special:"自備精油 60 分鐘 NT$800"}
+];
+
+let selected=null;
+
+function today(){return new Date().toISOString().slice(0,10)}
+function toMin(t){let a=t.split(":").map(Number);return a[0]*60+a[1]}
+function toTime(m){return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
+function add(t,m){return toTime(toMin(t)+m)}
+function norm(p){return (p||"").replace(/\D/g,"")}
+function bookings(){return JSON.parse(localStorage.getItem("yp_bk_v23")||"[]")}
+function save(b){localStorage.setItem("yp_bk_v23",JSON.stringify(b))}
+function openCall(e){e.preventDefault();callModal.classList.remove("hidden")}
+function closeCall(){callModal.classList.add("hidden")}
+
+function show(id){
+  ["customer","login","admin"].forEach(x=>document.getElementById(x).classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+  if(id==="login"||id==="admin"){document.body.classList.add("admin-mode")}
+  else{document.body.classList.remove("admin-mode")}
+  scrollTo(0,0)
+}
+function showCustomer(){show("customer")}
+function goAdmin(e){e.preventDefault();if(localStorage.getItem("yp_admin_v23")==="yes"){show("admin");renderAdmin()}else show("login")}
+
+function priceOf(s,dur){
+  if(["handnail","footnail","callus","ingrown","gua"].includes(s.id))return s.base;
+  let extra=Math.max(0,dur-s.baseDur);
+  return s.base+Math.ceil(extra/15)*200;
+}
+
+function seed(alertIt){
+  let d=today();
+  save([
+    {id:crypto.randomUUID(),type:"booking",date:d,staff:"boss",start:"14:00",end:"15:00",service:"全身按摩",customer:"王先生",phone:"0912-000-000",note:"肩頸較痠",price:800},
+    {id:crypto.randomUUID(),type:"booking",date:d,staff:"lady",start:"11:00",end:"11:45",service:"修腳皮",customer:"林小姐",phone:"02-0000-0000",note:"第一次來",price:500},
+    {id:crypto.randomUUID(),type:"block",date:d,staff:"lady",start:"16:00",end:"16:30",service:"吃飯",customer:"預留",phone:"",note:"",price:0}
+  ]);
+  if(alertIt){renderAdmin();alert("已重置")}
+}
+
+function init(){
+  dateInput.value=today();dateInput.min=today();
+  adminDate.value=today();manualDate.value=today();manualDate.min=today();
+  if(!localStorage.getItem("yp_bk_v23"))seed(false);
+  if(!localStorage.getItem("yp_buf_v23"))localStorage.setItem("yp_buf_v23","15");
+  buffer.value=localStorage.getItem("yp_buf_v23");
+  renderServices();
+  if(localStorage.getItem("yp_admin_v23")==="yes"){show("admin");renderAdmin()}else show("customer")
+}
+
+function renderServices(){
+  services.innerHTML="";
+  servicesDef.forEach(s=>{
+    let div=document.createElement("div");
+    div.className="service";
+    let h=`<label style="margin:0"><input type="checkbox" class="svc" value="${s.id}" onchange="toggleSvc('${s.id}')"> ${s.name}</label>
+    <div>${s.staff.map(x=>`<span class='chip'>${staffName[x]}</span>`).join("")}</div>
+    <div id="opt-${s.id}" class="hidden">`;
+
+    if(s.type==="free"){
+      h+=`<label>時間</label><select id="dur-${s.id}" onchange="clearSlots()">`;
+      s.opts.forEach(o=>{
+        let recText=s.recommended?(s.recommended.includes(o)?"（推薦）":""):(o===s.rec?"（推薦）":"");
+        h+=`<option value="${o}" ${o===s.rec?"selected":""}>${o} 分鐘${recText}</option>`;
+      });
+      h+=`</select>`;
+      if(s.parts){
+        h+=`<label>想針對處理（可複選）</label><div id="part-${s.id}" class="part-checks">`;
+        s.parts.forEach(p=>h+=`<label class="part-check"><input type="checkbox" value="${p}" onchange="clearSlots()"> ${p}</label>`);
+        h+=`</div><label>其他（選填）</label><textarea id="extra-${s.id}" placeholder="選填，例如：右肩抬不起來、彎腰會痛、左手容易麻..."></textarea><p class="muted">若上述選項無法完整描述您的狀況，可在此補充，例如哪裡痛、不舒服多久、什麼動作會痛。</p>`;
+      }
+    }
+    if(s.type==="fixed"){
+      h+=`<div class="notice">${s.label||"系統會自動預留服務時間。"}</div><input type="hidden" id="dur-${s.id}" value="${s.fixed}">`;
+    }
+    if(s.type==="level"){
+      h+=`<label>請選擇情況</label><select id="dur-${s.id}" onchange="clearSlots()">`;
+      s.levels.forEach(l=>h+=`<option value="${l[1]}" ${l[1]===s.rec?"selected":""}>${l[0]}（約 ${l[1]} 分）</option>`);
+      h+=`</select><p class="muted">不確定可選一般（推薦）。</p>`;
+    }
+    if(s.special)h+=`<p class="muted">${s.special}</p>`;
+    div.innerHTML=h+"</div>";
+    services.appendChild(div);
+  });
+}
+
+function toggleSvc(id){
+  document.getElementById("opt-"+id).classList.toggle("hidden",!document.querySelector(`.svc[value="${id}"]`).checked);
+  clearSlots();
+}
+function clearSlots(){
+  selected=null;
+  slots.innerHTML="";
+  slotTitle.classList.add("hidden");
+  previewBox.classList.add("hidden");
+}
+
+function selectedServices(){
+  return [...document.querySelectorAll(".svc:checked")].map(c=>{
+    let s=servicesDef.find(x=>x.id===c.value);
+    let dur=Number(document.getElementById("dur-"+s.id).value);
+    let displayName=s.name;
+    let part="";
+    if(s.parts){
+      let checked=[...document.querySelectorAll("#part-"+s.id+" input:checked")].map(x=>x.value);
+      let extra=(document.getElementById("extra-"+s.id)?.value||"").trim();
+      part=checked.join("、");
+      if(part)displayName=s.name+"（"+part+"）";
+      if(extra)displayName+="【其他："+extra+"】";
+    }
+    return {...s,name:displayName,rawName:s.name,part,dur,price:priceOf(s,dur)}
+  });
+}
+function total(ss){return ss.reduce((a,s)=>a+s.dur,0)}
+function totalPrice(ss){return ss.reduce((a,s)=>a+s.price,0)}
+function can(st,ss){return ss.every(s=>s.staff.includes(st))}
+function overlap(a,b,c,d){return toMin(a)<toMin(d)&&toMin(c)<toMin(b)}
+function getHours(date){
+  const all = JSON.parse(localStorage.getItem("yp_hours_v25")||"{}");
+  return all[date] || {open:"10:00", close:"22:00", label:"正常營業"};
+}
+function saveHours(date, data){
+  const all = JSON.parse(localStorage.getItem("yp_hours_v25")||"{}");
+  all[date] = data;
+  localStorage.setItem("yp_hours_v25", JSON.stringify(all));
+}
+function renderHoursStatus(){
+  if(!document.getElementById("hoursStatus")) return;
+  const d = adminDate.value || today();
+  const h = getHours(d);
+  hoursStatus.innerHTML = `<b>${d}</b><br>${h.label}<br>可預約時間：${h.open}～${h.close}`;
+}
+function setNormalHours(){
+  const d = adminDate.value || today();
+  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業"});
+  renderHoursStatus();
+  renderAdmin();
+  alert("已恢復正常營業時間");
+}
+function setEarlyClose(){
+  const d = adminDate.value || today();
+  const close = earlyCloseTime.value || "18:00";
+  saveHours(d, {open:"10:00", close, label:"提早打烊"});
+  renderHoursStatus();
+  renderAdmin();
+  alert("已設定提早打烊");
+}
+function setLateClose(){
+  const d = adminDate.value || today();
+  const close = lateCloseTime.value || "23:00";
+  saveHours(d, {open:"10:00", close, label:"延後打烊"});
+  renderHoursStatus();
+  renderAdmin();
+  alert("已設定延後打烊");
+}
+function available(date,staff,start,dur){
+  let buf=Number(localStorage.getItem("yp_buf_v23")||localStorage.getItem("yp_buf_v25")||15);
+  let end=add(start,dur+buf);
+  const h=getHours(date);
+  if(toMin(start)<toMin(h.open)||toMin(end)>toMin(h.close))return false;
+  return !bookings().filter(b=>b.date===date&&b.staff===staff).some(b=>overlap(start,end,b.start,b.end));
+}
+
+function calcSlots(){
+  selected=null;
+  let date=dateInput.value,ss=selectedServices(),st=staffInput.value,dur=total(ss),p=totalPrice(ss);
+  slots.innerHTML="";
+  if(!date||!ss.length){alert("請先選日期與服務");return}
+  totalBox.innerHTML=`已選：${ss.map(s=>s.name+" "+s.dur+"分").join("、")}<br>服務總時間：約 ${dur} 分鐘<br>預估價格：NT$${p}`;
+  totalBox.classList.remove("hidden");
+  slotTitle.classList.remove("hidden");
+
+  let cands=st==="any"?["boss","lady"].filter(x=>can(x,ss)):(can(st,ss)?[st]:[]);
+  if(!cands.length){
+    slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這組服務需要跨師傅接續。正式版會自動安排，此 Demo 先提示。</div>`;
+    return;
+  }
+  let count=0,buf=Number(localStorage.getItem("yp_buf_v23")||15);
+  const biz=getHours(date); for(let m=toMin(biz.open);m<=toMin(biz.close)-dur-buf;m+=15){
+    let t=toTime(m);
+    cands.forEach(staff=>{
+      let ok=available(date,staff,t,dur),d=document.createElement("div");
+      d.className="slot"+(ok?"":" disabled");
+      d.innerHTML=`${t}<br>${staffName[staff]}`;
+      if(ok){
+        count++;
+        d.onclick=()=>{
+          document.querySelectorAll(".slot").forEach(x=>x.classList.remove("sel"));
+          d.classList.add("sel");
+          selected={date,staff,start:t,dur,service:ss.map(s=>s.name).join("＋"),price:p};
+          previewBox.classList.add("hidden");
+        };
+      }
+      slots.appendChild(d);
+    });
+  }
+  if(!count)slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這天沒有符合條件的時段。</div>`;
+}
+
+function preview(){
+  if(!selected){alert("請先選時間");return}
+  let name=surname.value.trim();
+  let tel=phone.value.trim();
+  if(!name||!tel){alert("請先填寫姓氏與電話");return}
+  let end=add(selected.start,selected.dur);
+  previewBox.innerHTML=`<b>預約確認</b><br>
+  日期：${selected.date}<br>
+  時間：${selected.start}～${end}<br>
+  按摩師：${staffName[selected.staff]}<br>
+  服務：${selected.service}<br>
+  服務時間：約 ${selected.dur} 分鐘<br>
+  預估價格：NT$${selected.price}<br>
+  客人：${name}${title.value}<br>
+  電話：${tel}<br>
+  ${note.value.trim()?("備註："+note.value.trim()+"<br>"):""}
+  <br><b>確認內容無誤後，請按下方「送出預約」。</b>`;
+  previewBox.classList.remove("hidden");
+}
+
+function submitBooking(){
+  if(!selected){alert("請先選時間");return}
+  let name=surname.value.trim();
+  let tel=phone.value.trim();
+  if(!name||!tel){alert("姓氏與電話都是必填");return}
+  let item={
+    id:crypto.randomUUID(),
+    type:"booking",
+    date:selected.date,
+    staff:selected.staff,
+    start:selected.start,
+    end:add(selected.start,selected.dur),
+    service:selected.service,
+    customer:name+title.value,
+    phone:tel,
+    note:note.value.trim(),
+    price:selected.price
+  };
+  let b=bookings();b.push(item);save(b);
+  successBox.innerHTML=`<b>預約成功！</b><br>
+  ${item.date} ${item.start}～${item.end}<br>
+  ${staffName[item.staff]}｜${item.customer}<br>
+  ${item.service}<br>
+  預估價格：NT$${item.price}<br><br>
+  如需修改時間、服務項目或取消預約，請撥打店內室內電話聯繫。`;
+  successBox.classList.remove("hidden");
+  lookupPhone.value=item.phone;
+  calcSlots();
+}
+
+function lookup(){
+  let p=norm(lookupPhone.value);
+  if(!p){alert("請輸入電話");return}
+  let items=bookings().filter(b=>b.type==="booking"&&norm(b.phone)===p).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  lookupBox.innerHTML=items.length?items.map(b=>`<div class="appt"><div class="t">${b.date} ${b.start}～${b.end}</div>${staffName[b.staff]}｜${b.customer}<br>${b.service}<br>${b.price?("預估價格：NT$"+b.price+"<br>"):""}<span class="muted">修改或取消請撥打店內電話。</span></div>`).join(""):`<div class="notice">查無此電話的預約。</div>`;
+}
+
+function login(){
+  if(adminUser.value==="admin"&&adminPass.value==="1234"){
+    if(remember.checked)localStorage.setItem("yp_admin_v23","yes");
+    show("admin");renderAdmin();
+  }else alert("帳號或密碼錯誤");
+}
+function logout(){localStorage.removeItem("yp_admin_v23");show("customer")}
+
+function renderAdmin(){
+  renderHoursStatus();
+  let d=adminDate.value||today();
+  let items=bookings().filter(b=>b.date===d).sort((a,b)=>a.start.localeCompare(b.start));
+  renderRevenue(d, items);
+  if(!items.length){adminList.innerHTML="<p class='muted'>這天目前沒有預約。</p>";return}
+  adminList.innerHTML="";
+  ["boss","lady"].forEach(st=>{
+    adminList.innerHTML+=`<h3>${staffName[st]}</h3>`;
+    let g=items.filter(x=>x.staff===st);
+    if(!g.length)adminList.innerHTML+="<p class='muted'>無</p>";
+    g.forEach(b=>adminList.innerHTML+=`<div class="appt ${b.type==="block"?"block":""} ${b.done?"done":""}">
+      <div class="t">${b.start}～${b.end} ${b.done?"<span class='done-label'>已結束</span>":""}</div>
+      ${b.type==="block"?"預留：":""}${b.customer}｜${b.service}<br>
+      ${b.phone?"電話："+b.phone+"<br>":""}
+      ${b.price?("價格：NT$"+b.price+"<br>"):""}
+      ${b.note?("備註："+b.note+"<br>"):""}
+      ${b.done?"":`<button class="small" onclick="finish('${b.id}')">完成</button>`}
+      <button class="small" onclick="extend('${b.id}')">延長15分</button>
+      <button class="small danger" onclick="del('${b.id}')">取消</button>
+    </div>`);
+  });
+}
+
+
+function renderRevenue(date, items){
+  const counted = items.filter(b=>b.type!=="block");
+  const total = counted.reduce((sum,b)=>sum+Number(b.price||0),0);
+  const online = counted.filter(b=>b.type==="booking" && b.customer!=="現場客").reduce((sum,b)=>sum+Number(b.price||0),0);
+  const walkin = counted.filter(b=>b.customer==="現場客").reduce((sum,b)=>sum+Number(b.price||0),0);
+
+  if(document.getElementById("revenueBox")){
+    revenueBox.innerHTML = `
+      <b>${date}</b><br>
+      營業額合計：<b>NT$${total}</b><br>
+      線上預約：NT$${online}<br>
+      現場客：NT$${walkin}
+    `;
+  }
+
+  if(document.getElementById("revenueList")){
+    if(!counted.length){
+      revenueList.innerHTML = `<p class="muted">這天目前沒有營業額紀錄。</p>`;
+      return;
+    }
+    revenueList.innerHTML = counted.map(b=>`
+      <div class="appt">
+        <div class="t">${b.start}～${b.end}</div>
+        ${staffName[b.staff]}｜${b.customer}｜${b.service}<br>
+        金額：NT$${Number(b.price||0)}
+      </div>
+    `).join("");
+  }
+}
+
+function addManual(){
+  let date=manualDate.value,staff=manualStaff.value,start=manualStart.value,dur=Number(manualDur.value),service=manualService.value.trim()||(manualType.value==="block"?"預留時間":"現場服務"),manualAmount=Number(manualPrice.value||0);
+  if(!date||!start){alert("請填日期與開始時間");return}
+  if(!available(date,staff,start,dur)){alert("這段時間已有預約或超出營業時間");return}
+  let item={id:crypto.randomUUID(),type:manualType.value==="block"?"block":"booking",date,staff,start,end:add(start,dur),service,customer:manualType.value==="block"?"預留":"現場客",phone:"",note:"",price:manualType.value==="block"?0:manualAmount};
+  let b=bookings();b.push(item);save(b);renderAdmin();alert("已新增");
+}
+function finish(id){
+  if(confirm("確定將這筆預約標記為已結束？")){
+    let b=bookings();
+    let x=b.find(i=>i.id===id);
+    if(x){x.done=true}
+    save(b);
+    renderAdmin();
+  }
+}
+function extend(id){let b=bookings(),x=b.find(i=>i.id===id);x.end=add(x.end,15);save(b);renderAdmin()}
+function del(id){if(confirm("確定取消？")){save(bookings().filter(x=>x.id!==id));renderAdmin()}}
+function saveBuffer(){localStorage.setItem("yp_buf_v23",buffer.value);renderAdmin()}
+
+init();
+</script>
+</body>
+</html>
