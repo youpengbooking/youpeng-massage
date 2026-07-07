@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>宥朋養生推拿 測試站 v0.2</title>
+<title>宥朋養生推拿預約系統｜測試站 v0.3</title>
 <style>
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -75,22 +75,25 @@ body.admin-mode main{max-width:none;padding:0}
 </style>
 
 <style>
-.appt.done{
-  opacity:.55;
-  background:#eeeeee!important;
-  border-left-color:#999!important;
-  color:#666;
-}
-.appt.done .done-label{
-  display:inline-block;
-  background:#777;
-  color:#fff;
-  border-radius:999px;
-  padding:3px 9px;
-  font-size:12px;
-  font-weight:900;
-  margin-left:6px;
-}
+/* v0.3 後台打磨 */
+.admin-header{background:#2f2722!important;box-shadow:none!important}
+.admin-header h1{letter-spacing:.03em}
+.admin-actions button{margin-top:0!important}
+.admin-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.summary-box{background:#f7f3ee;border:1px solid #e3d6c8;border-radius:14px;padding:12px}
+.summary-box b{display:block;font-size:22px;color:#352a24;margin-top:4px}
+.appt{transition:opacity .2s ease, background .2s ease, border-color .2s ease}
+.appt.next{border-left-color:#a94438!important;background:#fff9f2!important}
+.appt.waiting{border-left-color:#b98245!important}
+.appt.done{opacity:.52;background:#eeeeee!important;border-left-color:#999!important;color:#666}
+.appt.done .t{color:#666}
+.done-label,.next-label{display:inline-block;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:900;margin-left:6px}
+.done-label{background:#777;color:#fff}
+.next-label{background:#a94438;color:#fff}
+.admin-page .card{box-shadow:none!important}
+.admin-page .appt button.small{opacity:.92}
+.admin-page .appt.done button.small:not(.danger){display:none}
+@media(max-width:380px){.admin-summary{grid-template-columns:1fr}}
 </style>
 
 </head>
@@ -228,7 +231,14 @@ body.admin-mode main{max-width:none;padding:0}
       <button class="danger" onclick="logout()">登出</button>
     </div>
 
+    
     <div class="card">
+      <h2>今日概況</h2>
+      <p class="muted">依照下方「查看日期」統計，已結束的預約會自動降低顯示。</p>
+      <div id="adminSummary" class="admin-summary"></div>
+    </div>
+
+<div class="card">
       <h2>預約清單</h2>
       <label>查看日期</label>
       <input type="date" id="adminDate" onchange="renderAdmin()">
@@ -590,10 +600,58 @@ function login(){
 }
 function logout(){localStorage.removeItem("yp_admin_v23");show("customer")}
 
+
+function isPastAppt(b){
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  if(b.date < todayStr) return true;
+  if(b.date > todayStr) return false;
+  return toMin(b.end) <= now.getHours()*60 + now.getMinutes();
+}
+function markDone(id){
+  if(confirm("確定將這筆預約標記為已結束？")){
+    let b=bookings();
+    let x=b.find(i=>i.id===id);
+    if(x){x.done=true}
+    save(b);
+    renderAdmin();
+  }
+}
+function markUndone(id){
+  let b=bookings();
+  let x=b.find(i=>i.id===id);
+  if(x){x.done=false}
+  save(b);
+  renderAdmin();
+}
+function renderAdminSummary(items){
+  if(!document.getElementById("adminSummary")) return;
+  const appts = items.filter(b=>b.type!=="block");
+  const done = appts.filter(b=>b.done || isPastAppt(b));
+  const pending = appts.filter(b=>!(b.done || isPastAppt(b)));
+  const revenue = appts.reduce((sum,b)=>sum+Number(b.price||0),0);
+  adminSummary.innerHTML = `
+    <div class="summary-box">總預約<b>${appts.length}</b></div>
+    <div class="summary-box">未完成<b>${pending.length}</b></div>
+    <div class="summary-box">已結束<b>${done.length}</b></div>
+    <div class="summary-box">營業額<b>NT$${revenue}</b></div>
+  `;
+}
+function nextAppointment(items){
+  const now = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  const todayStr = now.toISOString().slice(0,10);
+  const upcoming = items
+    .filter(b=>b.type!=="block" && !b.done && (b.date>todayStr || (b.date===todayStr && toMin(b.end)>nowMin)))
+    .sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  return upcoming[0]?.id || "";
+}
+
 function renderAdmin(){
   renderHoursStatus();
   let d=adminDate.value||today();
   let items=bookings().filter(b=>b.date===d).sort((a,b)=>a.start.localeCompare(b.start));
+  renderAdminSummary(items);
   renderRevenue(d, items);
   if(!items.length){adminList.innerHTML="<p class='muted'>這天目前沒有預約。</p>";return}
   adminList.innerHTML="";
@@ -601,16 +659,21 @@ function renderAdmin(){
     adminList.innerHTML+=`<h3>${staffName[st]}</h3>`;
     let g=items.filter(x=>x.staff===st);
     if(!g.length)adminList.innerHTML+="<p class='muted'>無</p>";
-    g.forEach(b=>adminList.innerHTML+=`<div class="appt ${b.type==="block"?"block":""} ${b.done?"done":""}">
-      <div class="t">${b.start}～${b.end} ${b.done?"<span class='done-label'>已結束</span>":""}</div>
-      ${b.type==="block"?"預留：":""}${b.customer}｜${b.service}<br>
-      ${b.phone?"電話："+b.phone+"<br>":""}
-      ${b.price?("價格：NT$"+b.price+"<br>"):""}
-      ${b.note?("備註："+b.note+"<br>"):""}
-      ${b.done?"":`<button class="small" onclick="finish('${b.id}')">完成</button>`}
-      <button class="small" onclick="extend('${b.id}')">延長15分</button>
-      <button class="small danger" onclick="del('${b.id}')">取消</button>
-    </div>`);
+    const nextId = nextAppointment(items);
+    g.forEach(b=>{
+      const finished = b.done || isPastAppt(b);
+      const cls = b.type==="block" ? "block" : (finished ? "done" : (b.id===nextId ? "next" : "waiting"));
+      adminList.innerHTML+=`<div class="appt ${cls}">
+        <div class="t">${b.start}～${b.end} ${finished?"<span class='done-label'>已結束</span>":(b.id===nextId?"<span class='next-label'>下一位</span>":"")}</div>
+        ${b.type==="block"?"預留：":""}${b.customer}｜${b.service}<br>
+        ${b.phone?"電話："+b.phone+"<br>":""}
+        ${b.price?("價格：NT$"+b.price+"<br>"):""}
+        ${b.note?("備註："+b.note+"<br>"):""}
+        ${b.type==="block"?"":(finished?`<button class="small ghost" onclick="markUndone('${b.id}')">恢復未完成</button>`:`<button class="small" onclick="markDone('${b.id}')">完成</button>`)}
+        <button class="small" onclick="extend('${b.id}')">延長15分</button>
+        <button class="small danger" onclick="del('${b.id}')">取消</button>
+      </div>`;
+    });
   });
 }
 
@@ -651,15 +714,6 @@ function addManual(){
   if(!available(date,staff,start,dur)){alert("這段時間已有預約或超出營業時間");return}
   let item={id:crypto.randomUUID(),type:manualType.value==="block"?"block":"booking",date,staff,start,end:add(start,dur),service,customer:manualType.value==="block"?"預留":"現場客",phone:"",note:"",price:manualType.value==="block"?0:manualAmount};
   let b=bookings();b.push(item);save(b);renderAdmin();alert("已新增");
-}
-function finish(id){
-  if(confirm("確定將這筆預約標記為已結束？")){
-    let b=bookings();
-    let x=b.find(i=>i.id===id);
-    if(x){x.done=true}
-    save(b);
-    renderAdmin();
-  }
 }
 function extend(id){let b=bookings(),x=b.find(i=>i.id===id);x.end=add(x.end,15);save(b);renderAdmin()}
 function del(id){if(confirm("確定取消？")){save(bookings().filter(x=>x.id!==id));renderAdmin()}}
