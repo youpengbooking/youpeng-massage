@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>宥朋養生推拿預約系統｜測試站 v0.3</title>
+<title>宥朋養生推拿預約系統｜測試站 v0.4</title>
 <style>
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -94,6 +94,118 @@ body.admin-mode main{max-width:none;padding:0}
 .admin-page .appt button.small{opacity:.92}
 .admin-page .appt.done button.small:not(.danger){display:none}
 @media(max-width:380px){.admin-summary{grid-template-columns:1fr}}
+</style>
+
+
+<style>
+/* v0.4 客人端基本美化 */
+.hero-inner{
+  border-radius:24px!important;
+  padding:22px!important;
+}
+.hero h1{
+  font-size:34px!important;
+  letter-spacing:.04em;
+}
+.hero-actions{
+  margin-top:16px;
+}
+.hero-actions .btn{
+  padding:15px 16px;
+}
+.card{
+  border-radius:18px!important;
+}
+#customer .card h2,
+.card h2{
+  letter-spacing:.02em;
+}
+#booking{
+  border:2px solid #E4D2C1;
+}
+#booking h2::before{
+  content:"📅 ";
+}
+.price-row{
+  align-items:flex-start;
+}
+.test-banner{
+  border-radius:16px!important;
+}
+
+/* v0.4 後台時間軸 */
+.timeline{
+  position:relative;
+  margin-top:12px;
+}
+.timeline-staff{
+  margin:18px 0 10px;
+  font-weight:900;
+  color:#352A24;
+}
+.timeline-item{
+  position:relative;
+  display:grid;
+  grid-template-columns:72px 1fr;
+  gap:10px;
+  margin:0 0 10px;
+}
+.timeline-time{
+  font-weight:900;
+  color:#6A5950;
+  font-size:14px;
+  padding-top:10px;
+  text-align:right;
+}
+.timeline-card{
+  border-left:5px solid #A94438;
+  background:#FFFDFB;
+  border:1px solid #E5D9CC;
+  border-left-width:5px;
+  border-radius:14px;
+  padding:11px 12px;
+  line-height:1.55;
+}
+.timeline-card.done{
+  opacity:.52;
+  background:#eeeeee;
+  border-left-color:#999;
+  color:#666;
+}
+.timeline-card.block{
+  border-left-color:#6B5A50;
+  background:#F3EEE8;
+}
+.timeline-card.break{
+  border-left-color:#C9B8A5;
+  background:#F7F3EE;
+  color:#7A6B60;
+  font-size:14px;
+}
+.timeline-title{
+  font-weight:900;
+  margin-bottom:3px;
+}
+.timeline-meta{
+  font-size:13px;
+  color:#6A5950;
+}
+.timeline-card.done .timeline-meta{
+  color:#777;
+}
+.timeline-empty{
+  color:#9B8C7D;
+  font-size:14px;
+  padding:10px 0 0 82px;
+}
+@media(max-width:420px){
+  .timeline-item{
+    grid-template-columns:58px 1fr;
+  }
+  .timeline-time{
+    font-size:13px;
+  }
+}
 </style>
 
 </head>
@@ -245,6 +357,15 @@ body.admin-mode main{max-width:none;padding:0}
       <div id="adminList"></div>
     </div>
 
+
+    <div class="card">
+      <h2>時間軸</h2>
+      <p class="muted">依照「查看日期」顯示當天行程，並把每位客人後面的休息時間一起列出。</p>
+      <div id="timelineBox" class="timeline"></div>
+    </div>
+
+
+
     
     
     <div class="card">
@@ -290,11 +411,11 @@ body.admin-mode main{max-width:none;padding:0}
 
     <div class="card">
       <h2>後台設定</h2>
-      <label>Buffer 緩衝時間</label>
-      <select id="buffer" onchange="saveBuffer()">
+      <label>休息時間</label>
+      <select id="breakTime" onchange="save休息時間()">
         <option value="0">0分鐘</option><option value="5">5分鐘</option><option value="10">10分鐘</option><option value="15">15分鐘</option><option value="20">20分鐘</option>
       </select>
-      <button class="ghost" onclick="seed(true)">重置 Demo 假資料</button>
+      <button class="ghost" onclick="seed(true)">重置測試資料</button>
     </div>
   </div>
 </section>
@@ -381,7 +502,7 @@ function init(){
   adminDate.value=today();manualDate.value=today();manualDate.min=today();
   if(!localStorage.getItem("yp_bk_v23"))seed(false);
   if(!localStorage.getItem("yp_buf_v23"))localStorage.setItem("yp_buf_v23","15");
-  buffer.value=localStorage.getItem("yp_buf_v23");
+  breakTime.value=localStorage.getItem("yp_buf_v23");
   renderServices();
   if(localStorage.getItem("yp_admin_v23")==="yes"){show("admin");renderAdmin()}else show("customer")
 }
@@ -652,6 +773,7 @@ function renderAdmin(){
   let d=adminDate.value||today();
   let items=bookings().filter(b=>b.date===d).sort((a,b)=>a.start.localeCompare(b.start));
   renderAdminSummary(items);
+  renderTimeline(items);
   renderRevenue(d, items);
   if(!items.length){adminList.innerHTML="<p class='muted'>這天目前沒有預約。</p>";return}
   adminList.innerHTML="";
@@ -675,6 +797,56 @@ function renderAdmin(){
       </div>`;
     });
   });
+}
+
+
+
+function renderTimeline(items){
+  if(!document.getElementById("timelineBox")) return;
+  const breakMin = Number(localStorage.getItem("yp_buf_v23")||localStorage.getItem("yp_buf_v25")||localStorage.getItem("yp_break_v04")||15);
+  if(!items.length){
+    timelineBox.innerHTML = `<p class="muted">這天目前沒有行程。</p>`;
+    return;
+  }
+
+  let html = "";
+  ["boss","lady"].forEach(st=>{
+    const group = items.filter(x=>x.staff===st).sort((a,b)=>a.start.localeCompare(b.start));
+    html += `<div class="timeline-staff">${staffName[st]}</div>`;
+    if(!group.length){
+      html += `<div class="timeline-empty">無行程</div>`;
+      return;
+    }
+    group.forEach(b=>{
+      const finished = b.done || isPastAppt(b);
+      const isBlock = b.type==="block";
+      html += `
+        <div class="timeline-item">
+          <div class="timeline-time">${b.start}<br>｜<br>${b.end}</div>
+          <div class="timeline-card ${finished?"done":""} ${isBlock?"block":""}">
+            <div class="timeline-title">${finished?"已結束｜":""}${isBlock?"預留時間":b.customer}</div>
+            <div>${b.service}</div>
+            ${b.phone?`<div class="timeline-meta">電話：${b.phone}</div>`:""}
+            ${b.price?`<div class="timeline-meta">金額：NT$${b.price}</div>`:""}
+          </div>
+        </div>
+      `;
+      if(!isBlock && breakMin>0){
+        const bs = b.end;
+        const be = add(b.end, breakMin);
+        html += `
+          <div class="timeline-item">
+            <div class="timeline-time">${bs}<br>｜<br>${be}</div>
+            <div class="timeline-card break">
+              <div class="timeline-title">休息時間</div>
+              <div>${breakMin} 分鐘整理／休息</div>
+            </div>
+          </div>
+        `;
+      }
+    });
+  });
+  timelineBox.innerHTML = html;
 }
 
 
@@ -717,7 +889,7 @@ function addManual(){
 }
 function extend(id){let b=bookings(),x=b.find(i=>i.id===id);x.end=add(x.end,15);save(b);renderAdmin()}
 function del(id){if(confirm("確定取消？")){save(bookings().filter(x=>x.id!==id));renderAdmin()}}
-function saveBuffer(){localStorage.setItem("yp_buf_v23",buffer.value);renderAdmin()}
+function save休息時間(){localStorage.setItem("yp_buf_v23",breakTime.value);renderAdmin()}
 
 init();
 </script>
