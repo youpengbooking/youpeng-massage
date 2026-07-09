@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第一階段：只同步預約資料
+// 目前第二階段：同步預約資料 + 營業時間
 // ===============================
 
 const firebaseConfig = {
@@ -13,10 +13,12 @@ const firebaseConfig = {
 };
 
 const BOOKINGS_KEY = "yp_bk_v23";
+const HOURS_KEY = "yp_hours_v25";
 
 let db = null;
 let fb = {};
 let bookingCache = [];
+let hoursCache = {};
 
 function loadLocalBookings(){
   try{
@@ -89,6 +91,70 @@ async function initFirebaseBookings(){
     console.error("Firebase 初始化失敗，暫時使用本機資料", error);
     bookingCache = loadLocalBookings();
     alert("Firebase 連線失敗，暫時使用這台裝置的本機資料。");
+  }
+}
+
+function loadLocalHours(){
+  try{
+    const data = JSON.parse(localStorage.getItem(HOURS_KEY) || "{}");
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  }catch(e){
+    console.error("讀取本機營業時間失敗", e);
+    return {};
+  }
+}
+
+function hoursDocRef(){
+  return fb.doc(db, "youpeng_sync", "hours");
+}
+
+async function initFirebaseHours(){
+  hoursCache = loadLocalHours();
+
+  if(!db || !fb.getDoc || !fb.setDoc){
+    console.warn("Firebase 尚未啟動，營業時間暫時使用本機資料");
+    return;
+  }
+
+  try{
+    const ref = hoursDocRef();
+    const snap = await fb.getDoc(ref);
+
+    if(snap.exists()){
+      const data = snap.data();
+      hoursCache = data.items && typeof data.items === "object" && !Array.isArray(data.items) ? data.items : {};
+    }else{
+      await fb.setDoc(ref, {
+        items: hoursCache,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      });
+    }
+
+    localStorage.setItem(HOURS_KEY, JSON.stringify(hoursCache));
+
+    fb.onSnapshot(ref, snapshot=>{
+      if(!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      hoursCache = data.items && typeof data.items === "object" && !Array.isArray(data.items) ? data.items : {};
+      localStorage.setItem(HOURS_KEY, JSON.stringify(hoursCache));
+
+      const adminPage = document.getElementById("admin");
+      if(adminPage && !adminPage.classList.contains("hidden")){
+        renderAdmin();
+      }
+    }, error=>{
+      console.error("Firestore 營業時間即時同步失敗", error);
+    });
+
+    console.log("Firebase 營業時間同步已啟動");
+
+  }catch(error){
+    console.error("Firebase 營業時間初始化失敗，暫時使用本機資料", error);
+    hoursCache = loadLocalHours();
+    localStorage.setItem(HOURS_KEY, JSON.stringify(hoursCache));
+    alert("營業時間同步失敗，暫時使用這台裝置的本機營業時間資料。");
   }
 }
 
@@ -198,6 +264,7 @@ async function init(){
   renderServices();
 
   await initFirebaseBookings();
+  await initFirebaseHours();
 
   if(localStorage.getItem("yp_admin_v23")==="yes"){
     show("admin");
@@ -284,14 +351,25 @@ function can(st,ss){return ss.every(s=>s.staff.includes(st))}
 function overlap(a,b,c,d){return toMin(a)<toMin(d)&&toMin(c)<toMin(b)}
 
 function getHours(date){
-  const all = JSON.parse(localStorage.getItem("yp_hours_v25")||"{}");
+  const all = hoursCache && typeof hoursCache === "object" && !Array.isArray(hoursCache) ? hoursCache : {};
   return all[date] || {open:"10:00", close:"22:00", label:"正常營業"};
 }
 
 function saveHours(date, data){
-  const all = JSON.parse(localStorage.getItem("yp_hours_v25")||"{}");
-  all[date] = data;
-  localStorage.setItem("yp_hours_v25", JSON.stringify(all));
+  hoursCache = hoursCache && typeof hoursCache === "object" && !Array.isArray(hoursCache) ? hoursCache : {};
+  hoursCache[date] = data;
+  localStorage.setItem(HOURS_KEY, JSON.stringify(hoursCache));
+
+  if(db && fb.setDoc){
+    fb.setDoc(hoursDocRef(), {
+      items: hoursCache,
+      version: 1,
+      updatedAt: fb.serverTimestamp()
+    }, {merge:true}).catch(error=>{
+      console.error("Firestore 營業時間儲存失敗", error);
+      alert("營業時間已暫存在本機，但同步到 Firebase 失敗。請檢查網路或 Firestore 規則。");
+    });
+  }
 }
 
 function renderHoursStatus(){
