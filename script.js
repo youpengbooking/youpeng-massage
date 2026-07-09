@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第三階段：同步預約資料 + 營業時間 + 休息時間
+// 目前第四階段：修防撞單 + 預留時間休息判斷
 // ===============================
 
 const firebaseConfig = {
@@ -21,6 +21,7 @@ let fb = {};
 let bookingCache = [];
 let hoursCache = {};
 let bufferCache = 15;
+let isSubmittingBooking = false;
 
 function loadLocalBookings(){
   try{
@@ -49,6 +50,7 @@ async function initFirebaseBookings(){
       getDoc: fsMod.getDoc,
       setDoc: fsMod.setDoc,
       onSnapshot: fsMod.onSnapshot,
+      runTransaction: fsMod.runTransaction,
       serverTimestamp: fsMod.serverTimestamp
     };
 
@@ -313,6 +315,81 @@ function save(b){
     });
   }
 }
+
+function syncBookingCache(list){
+  bookingCache = Array.isArray(list) ? list : [];
+  localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookingCache));
+}
+
+function fitsBusinessHours(date,start,dur){
+  const buf=getBuffer();
+  const end=add(start,dur+buf);
+  const h=getHours(date);
+  return !(toMin(start)<toMin(h.open)||toMin(end)>toMin(h.close));
+}
+
+function hasScheduleConflict(list,date,staff,start,dur,ignoreId=""){
+  const buf=getBuffer();
+  const proposedEnd=add(start,dur+buf);
+
+  return (Array.isArray(list)?list:[])
+    .filter(b=>b.date===date&&b.staff===staff&&b.id!==ignoreId)
+    .some(b=>overlap(start,proposedEnd,b.start,add(b.end,buf)));
+}
+
+function isSlotAvailableInList(list,date,staff,start,dur,ignoreId=""){
+  return fitsBusinessHours(date,start,dur) && !hasScheduleConflict(list,date,staff,start,dur,ignoreId);
+}
+
+async function addBookingWithLatestCheck(item,dur){
+  if(!db || !fb.runTransaction){
+    if(!isSlotAvailableInList(bookings(),item.date,item.staff,item.start,dur)){
+      const err = new Error("SLOT_TAKEN");
+      err.code = "SLOT_TAKEN";
+      throw err;
+    }
+
+    const next = bookings().concat(item);
+    save(next);
+    return next;
+  }
+
+  let latestList = null;
+
+  try{
+    const savedList = await fb.runTransaction(db, async transaction=>{
+      const ref = bookingDocRef();
+      const snap = await transaction.get(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const current = Array.isArray(data.items) ? data.items : [];
+      latestList = current;
+
+      if(!isSlotAvailableInList(current,item.date,item.staff,item.start,dur)){
+        const err = new Error("SLOT_TAKEN");
+        err.code = "SLOT_TAKEN";
+        throw err;
+      }
+
+      const next = current.concat(item);
+      transaction.set(ref, {
+        items: next,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      }, {merge:true});
+
+      return next;
+    });
+
+    syncBookingCache(savedList);
+    return savedList;
+
+  }catch(error){
+    if(latestList){
+      syncBookingCache(latestList);
+    }
+    throw error;
+  }
+}
 function openCall(e){e.preventDefault();callModal.classList.remove("hidden")}
 function closeCall(){callModal.classList.add("hidden")}
 
@@ -513,11 +590,7 @@ function setLateClose(){
 }
 
 function available(date,staff,start,dur){
-  let buf=getBuffer();
-  let end=add(start,dur+buf);
-  const h=getHours(date);
-  if(toMin(start)<toMin(h.open)||toMin(end)>toMin(h.close))return false;
-  return !bookings().filter(b=>b.date===date&&b.staff===staff).some(b=>overlap(start,end,b.start,b.end));
+  return isSlotAvailableInList(bookings(),date,staff,start,dur);
 }
 
 function calcSlots(){
@@ -598,7 +671,8 @@ function preview(){
   previewBox.classList.remove("hidden");
 }
 
-function submitBooking(){
+async function submitBooking(){
+  if(isSubmittingBooking) return;
   if(!selected){alert("請先選時間");return}
 
   let name=surname.value.trim();
@@ -609,34 +683,54 @@ function submitBooking(){
     return;
   }
 
+  const selectedNow = {...selected};
+
   let item={
     id:crypto.randomUUID(),
     type:"booking",
-    date:selected.date,
-    staff:selected.staff,
-    start:selected.start,
-    end:add(selected.start,selected.dur),
-    service:selected.service,
+    date:selectedNow.date,
+    staff:selectedNow.staff,
+    start:selectedNow.start,
+    end:add(selectedNow.start,selectedNow.dur),
+    service:selectedNow.service,
     customer:name+title.value,
     phone:tel,
     note:note.value.trim(),
-    price:selected.price
+    price:selectedNow.price
   };
 
-  let b=bookings();
-  b.push(item);
-  save(b);
+  isSubmittingBooking = true;
 
-  successBox.innerHTML=`<b>預約成功！</b><br>
-  ${item.date} ${item.start}～${item.end}<br>
-  ${staffName[item.staff]}｜${item.customer}<br>
-  ${item.service}<br>
-  預估價格：NT$${item.price}<br><br>
-  如需修改時間、服務項目或取消預約，請撥打店內室內電話聯繫。`;
+  try{
+    await addBookingWithLatestCheck(item, selectedNow.dur);
 
-  successBox.classList.remove("hidden");
-  lookupPhone.value=item.phone;
-  calcSlots();
+    successBox.innerHTML=`<b>預約成功！</b><br>
+    ${item.date} ${item.start}～${item.end}<br>
+    ${staffName[item.staff]}｜${item.customer}<br>
+    ${item.service}<br>
+    預估價格：NT$${item.price}<br><br>
+    如需修改時間、服務項目或取消預約，請撥打店內室內電話聯繫。`;
+
+    successBox.classList.remove("hidden");
+    lookupPhone.value=item.phone;
+    calcSlots();
+
+  }catch(error){
+    console.error("送出預約失敗", error);
+
+    selected=null;
+    previewBox.classList.add("hidden");
+    calcSlots();
+
+    if(error.code==="SLOT_TAKEN" || error.message==="SLOT_TAKEN"){
+      alert("這個時段剛剛已經被預約或被後台預留，請重新選擇其他時間。");
+    }else{
+      alert("預約送出失敗，請檢查網路後再試一次。");
+    }
+
+  }finally{
+    isSubmittingBooking = false;
+  }
 }
 
 function lookup(){
@@ -807,7 +901,7 @@ function renderTimeline(items){
         </div>
       `;
 
-      if(!isBlock && breakMin>0){
+      if(breakMin>0){
         const bs = b.end;
         const be = add(b.end, breakMin);
 
@@ -858,7 +952,7 @@ function renderRevenue(date, items){
   }
 }
 
-function addManual(){
+async function addManual(){
   let date=manualDate.value;
   let staff=manualStaff.value;
   let start=manualStart.value;
@@ -872,7 +966,7 @@ function addManual(){
   }
 
   if(!available(date,staff,start,dur)){
-    alert("這段時間已有預約或超出營業時間");
+    alert("這段時間已有預約、預留休息時間，或超出營業時間");
     return;
   }
 
@@ -890,11 +984,19 @@ function addManual(){
     price:manualType.value==="block"?0:manualAmount
   };
 
-  let b=bookings();
-  b.push(item);
-  save(b);
-  renderAdmin();
-  alert("已新增");
+  try{
+    await addBookingWithLatestCheck(item, dur);
+    renderAdmin();
+    alert("已新增");
+  }catch(error){
+    console.error("新增後台行程失敗", error);
+    if(error.code==="SLOT_TAKEN" || error.message==="SLOT_TAKEN"){
+      alert("這段時間已有預約、預留休息時間，或剛剛被其他裝置預約了。");
+      renderAdmin();
+    }else{
+      alert("新增失敗，請檢查網路後再試一次。");
+    }
+  }
 }
 
 function extend(id){
