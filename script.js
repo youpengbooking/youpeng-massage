@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第五階段：上線前整理 + 客人端修改取消
+// 目前第六階段：LINE 通知接入
 // ===============================
 
 const firebaseConfig = {
@@ -15,6 +15,7 @@ const firebaseConfig = {
 const BOOKINGS_KEY = "yp_bk_v23";
 const HOURS_KEY = "yp_hours_v25";
 const BUFFER_KEY = "yp_buf_v23";
+const LINE_NOTIFY_URL = "https://script.google.com/macros/s/AKfycbxPu47g8vjFOeHZJ-fdePQB4HKF36rj8X1AfKVaPiJ5XLClysg92A5X7ep1rYjQJzsG/exec";
 
 let db = null;
 let fb = {};
@@ -262,6 +263,59 @@ function saveBuffer(value){
       alert("休息時間已暫存在本機，但同步到 Firebase 失敗。請檢查網路或 Firestore 規則。");
     });
   }
+}
+
+
+function formatLineBooking(item){
+  const b = item || {};
+
+  return {
+    date: b.date || "",
+    start: b.start || "",
+    end: b.end || "",
+    staff: b.staff || "",
+    staffName: staffName[b.staff] || b.staff || "",
+    service: b.service || "",
+    customer: b.customer || "",
+    phone: b.phone || "",
+    price: Number(b.price || 0),
+    note: b.note || ""
+  };
+}
+
+function notifyLineBooking(type,item,oldItem){
+  if(!LINE_NOTIFY_URL) return;
+
+  const payload = {
+    source: "youpeng-booking",
+    type: type || "new",
+    booking: formatLineBooking(item)
+  };
+
+  if(oldItem){
+    payload.oldBooking = formatLineBooking(oldItem);
+  }
+
+  const body = JSON.stringify(payload);
+
+  try{
+    if(navigator.sendBeacon){
+      const blob = new Blob([body], {type:"text/plain;charset=UTF-8"});
+      const sent = navigator.sendBeacon(LINE_NOTIFY_URL, blob);
+      if(sent) return;
+    }
+  }catch(error){
+    console.warn("LINE sendBeacon 通知失敗，改用 fetch", error);
+  }
+
+  fetch(LINE_NOTIFY_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {"Content-Type":"text/plain;charset=UTF-8"},
+    body
+  }).catch(error=>{
+    console.warn("LINE 通知送出失敗，但預約資料已完成", error);
+  });
 }
 
 const staffName={boss:"老闆",lady:"老闆娘",any:"不限"};
@@ -657,6 +711,7 @@ async function cancelCustomerBooking(id){
 
   try{
     await cancelBookingWithLatestCheck(id, b.phone);
+    notifyLineBooking("cancel", b);
 
     if(editingBookingId===id){
       clearEditMode(true);
@@ -974,6 +1029,7 @@ async function submitBooking(){
 
   const selectedNow = {...selected};
   const isEdit = Boolean(editingBookingId);
+  const oldBookingForNotify = isEdit ? bookings().find(x=>x.id===editingBookingId && x.type==="booking") : null;
 
   let item={
     id:isEdit ? editingBookingId : crypto.randomUUID(),
@@ -994,8 +1050,10 @@ async function submitBooking(){
   try{
     if(isEdit){
       await editBookingWithLatestCheck(item, selectedNow.dur, editingBookingId, editingOriginalPhone || tel);
+      notifyLineBooking("update", item, oldBookingForNotify);
     }else{
       await addBookingWithLatestCheck(item, selectedNow.dur);
+      notifyLineBooking("new", item);
     }
 
     successBox.innerHTML=`<b>${isEdit?"預約修改成功！":"預約成功！"}</b><br>
