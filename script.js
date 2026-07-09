@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第四階段：修防撞單 + 預留時間休息判斷
+// 目前第五階段：上線前整理 + 客人端修改取消
 // ===============================
 
 const firebaseConfig = {
@@ -22,6 +22,10 @@ let bookingCache = [];
 let hoursCache = {};
 let bufferCache = 15;
 let isSubmittingBooking = false;
+let editingBookingId = "";
+let editingOriginalPhone = "";
+
+const ADMIN_PASS_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
 
 function loadLocalBookings(){
   try{
@@ -296,6 +300,12 @@ function toMin(t){let a=t.split(":").map(Number);return a[0]*60+a[1]}
 function toTime(m){return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
 function add(t,m){return toTime(toMin(t)+m)}
 function norm(p){return (p||"").replace(/\D/g,"")}
+
+async function sha256Text(text){
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
 function bookings(){
   return Array.isArray(bookingCache) ? bookingCache : [];
 }
@@ -390,6 +400,285 @@ async function addBookingWithLatestCheck(item,dur){
     throw error;
   }
 }
+
+async function editBookingWithLatestCheck(item,dur,oldId,phoneCheck){
+  if(!oldId){
+    const err = new Error("EDIT_NOT_FOUND");
+    err.code = "EDIT_NOT_FOUND";
+    throw err;
+  }
+
+  if(!db || !fb.runTransaction){
+    const current = bookings();
+    const old = current.find(x=>x.id===oldId && x.type==="booking");
+
+    if(!old || norm(old.phone)!==norm(phoneCheck)){
+      const err = new Error("EDIT_NOT_FOUND");
+      err.code = "EDIT_NOT_FOUND";
+      throw err;
+    }
+
+    const withoutOld = current.filter(x=>x.id!==oldId);
+
+    if(!isSlotAvailableInList(withoutOld,item.date,item.staff,item.start,dur)){
+      const err = new Error("SLOT_TAKEN");
+      err.code = "SLOT_TAKEN";
+      throw err;
+    }
+
+    const next = withoutOld.concat(item);
+    save(next);
+    return next;
+  }
+
+  let latestList = null;
+
+  try{
+    const savedList = await fb.runTransaction(db, async transaction=>{
+      const ref = bookingDocRef();
+      const snap = await transaction.get(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const current = Array.isArray(data.items) ? data.items : [];
+      latestList = current;
+
+      const old = current.find(x=>x.id===oldId && x.type==="booking");
+
+      if(!old || norm(old.phone)!==norm(phoneCheck)){
+        const err = new Error("EDIT_NOT_FOUND");
+        err.code = "EDIT_NOT_FOUND";
+        throw err;
+      }
+
+      const withoutOld = current.filter(x=>x.id!==oldId);
+
+      if(!isSlotAvailableInList(withoutOld,item.date,item.staff,item.start,dur)){
+        const err = new Error("SLOT_TAKEN");
+        err.code = "SLOT_TAKEN";
+        throw err;
+      }
+
+      const next = withoutOld.concat(item);
+
+      transaction.set(ref, {
+        items: next,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      }, {merge:true});
+
+      return next;
+    });
+
+    syncBookingCache(savedList);
+    return savedList;
+
+  }catch(error){
+    if(latestList){
+      syncBookingCache(latestList);
+    }
+    throw error;
+  }
+}
+
+async function cancelBookingWithLatestCheck(id,phoneCheck){
+  if(!id){
+    const err = new Error("CANCEL_NOT_FOUND");
+    err.code = "CANCEL_NOT_FOUND";
+    throw err;
+  }
+
+  if(!db || !fb.runTransaction){
+    const current = bookings();
+    const old = current.find(x=>x.id===id && x.type==="booking");
+
+    if(!old || norm(old.phone)!==norm(phoneCheck)){
+      const err = new Error("CANCEL_NOT_FOUND");
+      err.code = "CANCEL_NOT_FOUND";
+      throw err;
+    }
+
+    const next = current.filter(x=>x.id!==id);
+    save(next);
+    return next;
+  }
+
+  let latestList = null;
+
+  try{
+    const savedList = await fb.runTransaction(db, async transaction=>{
+      const ref = bookingDocRef();
+      const snap = await transaction.get(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const current = Array.isArray(data.items) ? data.items : [];
+      latestList = current;
+
+      const old = current.find(x=>x.id===id && x.type==="booking");
+
+      if(!old || norm(old.phone)!==norm(phoneCheck)){
+        const err = new Error("CANCEL_NOT_FOUND");
+        err.code = "CANCEL_NOT_FOUND";
+        throw err;
+      }
+
+      const next = current.filter(x=>x.id!==id);
+
+      transaction.set(ref, {
+        items: next,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      }, {merge:true});
+
+      return next;
+    });
+
+    syncBookingCache(savedList);
+    return savedList;
+
+  }catch(error){
+    if(latestList){
+      syncBookingCache(latestList);
+    }
+    throw error;
+  }
+}
+
+function splitCustomerName(fullName){
+  const text = (fullName || "").trim();
+
+  if(text.endsWith("先生")){
+    return {surname:text.slice(0,-2), title:"先生"};
+  }
+
+  if(text.endsWith("小姐")){
+    return {surname:text.slice(0,-2), title:"小姐"};
+  }
+
+  return {surname:text, title:"先生"};
+}
+
+function clearServiceSelections(){
+  document.querySelectorAll(".svc").forEach(c=>{
+    c.checked = false;
+    const box = document.getElementById("opt-"+c.value);
+    if(box) box.classList.add("hidden");
+  });
+}
+
+function clearEditMode(keepFields){
+  editingBookingId = "";
+  editingOriginalPhone = "";
+
+  const box = document.getElementById("editNotice");
+  if(box){
+    box.innerHTML = "";
+    box.classList.add("hidden");
+  }
+
+  const btn = document.getElementById("submitBtn");
+  if(btn) btn.textContent = "送出預約";
+
+  if(!keepFields){
+    clearServiceSelections();
+    clearSlots();
+  }
+}
+
+function cancelEditMode(){
+  clearEditMode(true);
+  alert("已取消修改模式。");
+}
+
+function startEditBooking(id){
+  const p = norm(lookupPhone.value);
+  const b = bookings().find(x=>x.id===id && x.type==="booking");
+
+  if(!b){
+    alert("找不到這筆預約，可能已經被取消。");
+    lookup();
+    return;
+  }
+
+  if(!p || norm(b.phone)!==p){
+    alert("請先用原本預約電話查詢，再修改預約。");
+    return;
+  }
+
+  const parsed = splitCustomerName(b.customer);
+
+  editingBookingId = b.id;
+  editingOriginalPhone = b.phone;
+
+  dateInput.value = b.date;
+  staffInput.value = b.staff;
+  surname.value = parsed.surname;
+  title.value = parsed.title;
+  phone.value = b.phone;
+  note.value = b.note || "";
+
+  clearServiceSelections();
+  clearSlots();
+
+  totalBox.classList.add("hidden");
+  previewBox.classList.add("hidden");
+  successBox.classList.add("hidden");
+
+  const box = document.getElementById("editNotice");
+  if(box){
+    box.innerHTML = `<b>正在修改預約</b><br>
+    原預約：${b.date} ${b.start}～${b.end}｜${staffName[b.staff]}｜${b.service}<br>
+    請重新選擇服務、日期與時間，確認後按「送出修改」。<br>
+    <button class="small ghost" onclick="cancelEditMode()">取消修改模式</button>`;
+    box.classList.remove("hidden");
+  }
+
+  const btn = document.getElementById("submitBtn");
+  if(btn) btn.textContent = "送出修改";
+
+  document.getElementById("booking").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+async function cancelCustomerBooking(id){
+  const p = norm(lookupPhone.value);
+  const b = bookings().find(x=>x.id===id && x.type==="booking");
+
+  if(!b){
+    alert("找不到這筆預約，可能已經被取消。");
+    lookup();
+    return;
+  }
+
+  if(!p || norm(b.phone)!==p){
+    alert("請先用原本預約電話查詢，再取消預約。");
+    return;
+  }
+
+  if(!confirm(`確定取消這筆預約？\n${b.date} ${b.start}～${b.end}\n${staffName[b.staff]}｜${b.service}`)){
+    return;
+  }
+
+  try{
+    await cancelBookingWithLatestCheck(id, b.phone);
+
+    if(editingBookingId===id){
+      clearEditMode(true);
+    }
+
+    alert("已取消預約。");
+    lookup();
+    clearSlots();
+    renderAdmin();
+
+  }catch(error){
+    console.error("客人端取消預約失敗", error);
+
+    if(error.code==="CANCEL_NOT_FOUND" || error.message==="CANCEL_NOT_FOUND"){
+      alert("這筆預約已不存在或電話不符合，請重新查詢。");
+      lookup();
+    }else{
+      alert("取消失敗，請檢查網路後再試一次。");
+    }
+  }
+}
+
 function openCall(e){e.preventDefault();callModal.classList.remove("hidden")}
 function closeCall(){callModal.classList.add("hidden")}
 
@@ -610,7 +899,7 @@ function calcSlots(){
   let cands=st==="any"?["boss","lady"].filter(x=>can(x,ss)):(can(st,ss)?[st]:[]);
 
   if(!cands.length){
-    slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這組服務需要跨師傅接續。正式版會自動安排，此測試版先提示。</div>`;
+    slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這組服務需要跨師傅接續，請直接致電店內協助安排。</div>`;
     return;
   }
 
@@ -656,7 +945,7 @@ function preview(){
 
   let end=add(selected.start,selected.dur);
 
-  previewBox.innerHTML=`<b>預約確認</b><br>
+  previewBox.innerHTML=`<b>${editingBookingId?"修改預約確認":"預約確認"}</b><br>
   日期：${selected.date}<br>
   時間：${selected.start}～${end}<br>
   按摩師：${staffName[selected.staff]}<br>
@@ -666,7 +955,7 @@ function preview(){
   客人：${name}${title.value}<br>
   電話：${tel}<br>
   ${note.value.trim()?("備註："+note.value.trim()+"<br>"):""}
-  <br><b>確認內容無誤後，請按下方「送出預約」。</b>`;
+  <br><b>確認內容無誤後，請按下方「${editingBookingId?"送出修改":"送出預約"}」。</b>`;
 
   previewBox.classList.remove("hidden");
 }
@@ -684,9 +973,10 @@ async function submitBooking(){
   }
 
   const selectedNow = {...selected};
+  const isEdit = Boolean(editingBookingId);
 
   let item={
-    id:crypto.randomUUID(),
+    id:isEdit ? editingBookingId : crypto.randomUUID(),
     type:"booking",
     date:selectedNow.date,
     staff:selectedNow.staff,
@@ -702,21 +992,31 @@ async function submitBooking(){
   isSubmittingBooking = true;
 
   try{
-    await addBookingWithLatestCheck(item, selectedNow.dur);
+    if(isEdit){
+      await editBookingWithLatestCheck(item, selectedNow.dur, editingBookingId, editingOriginalPhone || tel);
+    }else{
+      await addBookingWithLatestCheck(item, selectedNow.dur);
+    }
 
-    successBox.innerHTML=`<b>預約成功！</b><br>
+    successBox.innerHTML=`<b>${isEdit?"預約修改成功！":"預約成功！"}</b><br>
     ${item.date} ${item.start}～${item.end}<br>
     ${staffName[item.staff]}｜${item.customer}<br>
     ${item.service}<br>
     預估價格：NT$${item.price}<br><br>
-    如需修改時間、服務項目或取消預約，請撥打店內室內電話聯繫。`;
+    可用上方「查詢我的預約」查看、修改或取消預約。`;
 
     successBox.classList.remove("hidden");
     lookupPhone.value=item.phone;
+
+    if(isEdit){
+      clearEditMode(true);
+      lookup();
+    }
+
     calcSlots();
 
   }catch(error){
-    console.error("送出預約失敗", error);
+    console.error(isEdit ? "修改預約失敗" : "送出預約失敗", error);
 
     selected=null;
     previewBox.classList.add("hidden");
@@ -724,8 +1024,12 @@ async function submitBooking(){
 
     if(error.code==="SLOT_TAKEN" || error.message==="SLOT_TAKEN"){
       alert("這個時段剛剛已經被預約或被後台預留，請重新選擇其他時間。");
+    }else if(error.code==="EDIT_NOT_FOUND" || error.message==="EDIT_NOT_FOUND"){
+      alert("原本的預約已不存在或電話不符合，請重新查詢。");
+      clearEditMode(true);
+      lookup();
     }else{
-      alert("預約送出失敗，請檢查網路後再試一次。");
+      alert(isEdit ? "修改失敗，請檢查網路後再試一次。" : "預約送出失敗，請檢查網路後再試一次。");
     }
 
   }finally{
@@ -746,17 +1050,35 @@ function lookup(){
     .sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
 
   lookupBox.innerHTML=items.length
-    ?items.map(b=>`<div class="appt"><div class="t">${b.date} ${b.start}～${b.end}</div>${staffName[b.staff]}｜${b.customer}<br>${b.service}<br>${b.price?("預估價格：NT$"+b.price+"<br>"):""}<span class="muted">修改或取消請撥打店內電話。</span></div>`).join("")
+    ?items.map(b=>`<div class="appt">
+      <div class="t">${b.date} ${b.start}～${b.end}</div>
+      ${staffName[b.staff]}｜${b.customer}<br>
+      ${b.service}<br>
+      ${b.price?("預估價格：NT$"+b.price+"<br>"):""}
+      ${b.note?("備註："+b.note+"<br>"):""}
+      <div class="lookup-actions">
+        <button class="small" onclick="startEditBooking('${b.id}')">修改</button>
+        <button class="small danger" onclick="cancelCustomerBooking('${b.id}')">取消</button>
+      </div>
+    </div>`).join("")
     :`<div class="notice">查無此電話的預約。</div>`;
 }
 
-function login(){
-  if(adminPass.value==="1234"){
-    if(remember.checked)localStorage.setItem("yp_admin_v23","yes");
-    show("admin");
-    renderAdmin();
-  }else{
-    alert("密碼錯誤");
+async function login(){
+  try{
+    const pass = adminPass.value || "";
+    const hash = await sha256Text(pass);
+
+    if(hash===ADMIN_PASS_HASH){
+      if(remember.checked)localStorage.setItem("yp_admin_v23","yes");
+      show("admin");
+      renderAdmin();
+    }else{
+      alert("密碼錯誤");
+    }
+  }catch(error){
+    console.error("登入失敗", error);
+    alert("登入失敗，請重新整理後再試一次。");
   }
 }
 
