@@ -1,3 +1,97 @@
+// ===============================
+// Firebase / Firestore 設定
+// 目前第一階段：只同步預約資料
+// ===============================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCH3CD_TypwfW0UtWOK_Mawt4DaPVBtnkk",
+  authDomain: "youpeng-booking.firebaseapp.com",
+  projectId: "youpeng-booking",
+  storageBucket: "youpeng-booking.firebasestorage.app",
+  messagingSenderId: "276717234519",
+  appId: "1:276717234519:web:82f9aa4d30d909dfb2b612"
+};
+
+const BOOKINGS_KEY = "yp_bk_v23";
+
+let db = null;
+let fb = {};
+let bookingCache = [];
+
+function loadLocalBookings(){
+  try{
+    const data = JSON.parse(localStorage.getItem(BOOKINGS_KEY) || "[]");
+    return Array.isArray(data) ? data : [];
+  }catch(e){
+    console.error("讀取本機預約資料失敗", e);
+    return [];
+  }
+}
+
+function bookingDocRef(){
+  return fb.doc(db, "youpeng_sync", "bookings");
+}
+
+async function initFirebaseBookings(){
+  try{
+    const appMod = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js");
+    const fsMod = await import("https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js");
+
+    const app = appMod.initializeApp(firebaseConfig);
+
+    fb = {
+      getFirestore: fsMod.getFirestore,
+      doc: fsMod.doc,
+      getDoc: fsMod.getDoc,
+      setDoc: fsMod.setDoc,
+      onSnapshot: fsMod.onSnapshot,
+      serverTimestamp: fsMod.serverTimestamp
+    };
+
+    db = fb.getFirestore(app);
+
+    const ref = bookingDocRef();
+    const snap = await fb.getDoc(ref);
+
+    if(snap.exists()){
+      const data = snap.data();
+      bookingCache = Array.isArray(data.items) ? data.items : [];
+    }else{
+      bookingCache = loadLocalBookings();
+
+      await fb.setDoc(ref, {
+        items: bookingCache,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      });
+    }
+
+    localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookingCache));
+
+    fb.onSnapshot(ref, snapshot=>{
+      if(!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      bookingCache = Array.isArray(data.items) ? data.items : [];
+      localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookingCache));
+
+      const adminPage = document.getElementById("admin");
+      if(adminPage && !adminPage.classList.contains("hidden")){
+        renderAdmin();
+      }
+    }, error=>{
+      console.error("Firestore 即時同步失敗", error);
+    });
+
+    console.log("Firebase 預約資料同步已啟動");
+
+  }catch(error){
+    console.error("Firebase 初始化失敗，暫時使用本機資料", error);
+    bookingCache = loadLocalBookings();
+    alert("Firebase 連線失敗，暫時使用這台裝置的本機資料。");
+  }
+}
+
 const staffName={boss:"老闆",lady:"老闆娘",any:"不限"};
 
 const painItems=[
@@ -28,8 +122,25 @@ function toMin(t){let a=t.split(":").map(Number);return a[0]*60+a[1]}
 function toTime(m){return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")}
 function add(t,m){return toTime(toMin(t)+m)}
 function norm(p){return (p||"").replace(/\D/g,"")}
-function bookings(){return JSON.parse(localStorage.getItem("yp_bk_v23")||"[]")}
-function save(b){localStorage.setItem("yp_bk_v23",JSON.stringify(b))}
+function bookings(){
+  return Array.isArray(bookingCache) ? bookingCache : [];
+}
+
+function save(b){
+  bookingCache = Array.isArray(b) ? b : [];
+  localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookingCache));
+
+  if(db && fb.setDoc){
+    fb.setDoc(bookingDocRef(), {
+      items: bookingCache,
+      version: 1,
+      updatedAt: fb.serverTimestamp()
+    }, {merge:true}).catch(error=>{
+      console.error("Firestore 儲存失敗", error);
+      alert("資料已暫存在本機，但同步到 Firebase 失敗。請檢查網路或 Firestore 規則。");
+    });
+  }
+}
 function openCall(e){e.preventDefault();callModal.classList.remove("hidden")}
 function closeCall(){callModal.classList.add("hidden")}
 
@@ -69,21 +180,24 @@ function seed(alertIt){
   if(alertIt){renderAdmin();alert("已重置")}
 }
 
-function init(){
+async function init(){
   dateInput.value=today();
   dateInput.min=today();
   adminDate.value=today();
   manualDate.value=today();
   manualDate.min=today();
 
-  if(!localStorage.getItem("yp_bk_v23"))seed(false);
-  if(!localStorage.getItem("yp_buf_v23"))localStorage.setItem("yp_buf_v23","15");
+  if(!localStorage.getItem("yp_buf_v23")){
+    localStorage.setItem("yp_buf_v23","15");
+  }
 
   if(document.getElementById("breakTime")){
     breakTime.value=localStorage.getItem("yp_buf_v23");
   }
 
   renderServices();
+
+  await initFirebaseBookings();
 
   if(localStorage.getItem("yp_admin_v23")==="yes"){
     show("admin");
