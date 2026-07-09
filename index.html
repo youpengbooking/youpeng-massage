@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>宥朋養生推拿預約系統｜測試站 v0.4</title>
+<title>宥朋養生推拿預約系統</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,6 @@
 <section class="hero">
   <div class="hero-inner">
     <span class="badge">新莊・中誠街57號</span><br>
-    <span class="test-label">測試版</span>
     <h1>宥朋養生推拿</h1>
     <p class="tagline">專業推拿・放鬆舒壓</p>
     <div class="hero-actions">
@@ -21,8 +20,6 @@
     </div>
   </div>
 </section>
-
-<div class="test-banner"><b>測試版</b>：目前此網站仍在開發與試用中，功能、價格與預約流程都還可能調整，尚未正式對外使用。</div>
 
 <main>
 <section class="card">
@@ -46,7 +43,7 @@
 <section id="customer">
   <div class="card">
     <h2>查詢我的預約</h2>
-    <p class="muted">輸入預約時留下的電話，即可查看自己的預約。</p>
+    <p class="muted">輸入預約時留下的電話，即可查看、修改或取消自己的預約。</p>
     <label>電話</label>
     <input id="lookupPhone" placeholder="請輸入預約電話">
     <button class="secondary" onclick="lookup()">查詢預約</button>
@@ -55,6 +52,7 @@
 
   <div class="card" id="booking">
     <h2>預約</h2>
+    <div id="editNotice" class="notice hidden"></div>
 
     <label>1. 選日期</label>
     <input type="date" id="dateInput">
@@ -96,7 +94,7 @@
     <button onclick="preview()">確認預約內容</button>
     <div id="previewBox" class="notice hidden"></div>
 
-    <button onclick="submitBooking()">送出預約</button>
+    <button id="submitBtn" onclick="submitBooking()">送出預約</button>
     <div id="successBox" class="success hidden"></div>
   </div>
 </section>
@@ -120,9 +118,8 @@
 <section id="login" class="hidden login-shell">
   <div class="card">
     <h2>宥朋店家後台登入</h2>
-    <p class="muted">測試版帳號：admin　密碼：1234</p>
-    <label>帳號</label><input id="adminUser">
-    <label>密碼</label><input id="adminPass" type="password">
+    <p class="muted">請輸入店家後台密碼。</p>
+    <label>密碼</label><input id="adminPass" type="password" autocomplete="current-password">
     <label style="display:flex;gap:8px;align-items:center"><input id="remember" type="checkbox" checked style="width:auto">保持登入，下次直接查看後台</label>
     <button onclick="login()">登入後台</button>
     <button class="ghost" onclick="showCustomer()">回到客人網站</button>
@@ -133,7 +130,7 @@
   <div class="admin-shell">
     <div class="admin-header">
       <h1>宥朋店家後台</h1>
-      <p>測試版｜登入後只顯示店家管理功能</p>
+      <p>登入後只顯示店家管理功能</p>
     </div>
     <div class="admin-actions">
       <button class="secondary" onclick="showCustomer()">回到客人網站</button>
@@ -206,7 +203,6 @@
       <select id="breakTime" onchange="save休息時間()">
         <option value="0">0分鐘</option><option value="5">5分鐘</option><option value="10">10分鐘</option><option value="15">15分鐘</option><option value="20">20分鐘</option>
       </select>
-      <button class="ghost" onclick="seed(true)">重置測試資料</button>
     </div>
   </div>
 </section>
