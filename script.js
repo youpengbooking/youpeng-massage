@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第二階段：同步預約資料 + 營業時間
+// 目前第三階段：同步預約資料 + 營業時間 + 休息時間
 // ===============================
 
 const firebaseConfig = {
@@ -14,11 +14,13 @@ const firebaseConfig = {
 
 const BOOKINGS_KEY = "yp_bk_v23";
 const HOURS_KEY = "yp_hours_v25";
+const BUFFER_KEY = "yp_buf_v23";
 
 let db = null;
 let fb = {};
 let bookingCache = [];
 let hoursCache = {};
+let bufferCache = 15;
 
 function loadLocalBookings(){
   try{
@@ -158,6 +160,104 @@ async function initFirebaseHours(){
   }
 }
 
+function loadLocalBuffer(){
+  const raw = localStorage.getItem(BUFFER_KEY) || localStorage.getItem("yp_buf_v25") || localStorage.getItem("yp_break_v04") || "15";
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 15;
+}
+
+function bufferDocRef(){
+  return fb.doc(db, "youpeng_sync", "buffer");
+}
+
+async function initFirebaseBuffer(){
+  bufferCache = loadLocalBuffer();
+
+  if(!db || !fb.getDoc || !fb.setDoc){
+    console.warn("Firebase 尚未啟動，休息時間暫時使用本機資料");
+    return;
+  }
+
+  try{
+    const ref = bufferDocRef();
+    const snap = await fb.getDoc(ref);
+
+    if(snap.exists()){
+      const data = snap.data();
+      const n = Number(data.minutes);
+      bufferCache = Number.isFinite(n) && n >= 0 ? n : 15;
+    }else{
+      await fb.setDoc(ref, {
+        minutes: bufferCache,
+        version: 1,
+        updatedAt: fb.serverTimestamp()
+      });
+    }
+
+    localStorage.setItem(BUFFER_KEY, String(bufferCache));
+
+    if(document.getElementById("breakTime")){
+      breakTime.value = String(bufferCache);
+    }
+
+    fb.onSnapshot(ref, snapshot=>{
+      if(!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      const n = Number(data.minutes);
+      bufferCache = Number.isFinite(n) && n >= 0 ? n : 15;
+      localStorage.setItem(BUFFER_KEY, String(bufferCache));
+
+      if(document.getElementById("breakTime")){
+        breakTime.value = String(bufferCache);
+      }
+
+      clearSlots();
+
+      const adminPage = document.getElementById("admin");
+      if(adminPage && !adminPage.classList.contains("hidden")){
+        renderAdmin();
+      }
+    }, error=>{
+      console.error("Firestore 休息時間即時同步失敗", error);
+    });
+
+    console.log("Firebase 休息時間同步已啟動");
+
+  }catch(error){
+    console.error("Firebase 休息時間初始化失敗，暫時使用本機資料", error);
+    bufferCache = loadLocalBuffer();
+    localStorage.setItem(BUFFER_KEY, String(bufferCache));
+    alert("休息時間同步失敗，暫時使用這台裝置的本機休息時間資料。");
+  }
+}
+
+function getBuffer(){
+  const n = Number(bufferCache);
+  return Number.isFinite(n) && n >= 0 ? n : 15;
+}
+
+function saveBuffer(value){
+  const n = Number(value);
+  bufferCache = Number.isFinite(n) && n >= 0 ? n : 15;
+  localStorage.setItem(BUFFER_KEY, String(bufferCache));
+
+  if(document.getElementById("breakTime")){
+    breakTime.value = String(bufferCache);
+  }
+
+  if(db && fb.setDoc){
+    fb.setDoc(bufferDocRef(), {
+      minutes: bufferCache,
+      version: 1,
+      updatedAt: fb.serverTimestamp()
+    }, {merge:true}).catch(error=>{
+      console.error("Firestore 休息時間儲存失敗", error);
+      alert("休息時間已暫存在本機，但同步到 Firebase 失敗。請檢查網路或 Firestore 規則。");
+    });
+  }
+}
+
 const staffName={boss:"老闆",lady:"老闆娘",any:"不限"};
 
 const painItems=[
@@ -259,18 +359,19 @@ async function init(){
   manualDate.value=today();
   manualDate.min=today();
 
-  if(!localStorage.getItem("yp_buf_v23")){
-    localStorage.setItem("yp_buf_v23","15");
-  }
-
-  if(document.getElementById("breakTime")){
-    breakTime.value=localStorage.getItem("yp_buf_v23");
+  if(!localStorage.getItem(BUFFER_KEY)){
+    localStorage.setItem(BUFFER_KEY,"15");
   }
 
   renderServices();
 
   await initFirebaseBookings();
   await initFirebaseHours();
+  await initFirebaseBuffer();
+
+  if(document.getElementById("breakTime")){
+    breakTime.value=String(getBuffer());
+  }
 
   if(localStorage.getItem("yp_admin_v23")==="yes"){
     show("admin");
@@ -412,7 +513,7 @@ function setLateClose(){
 }
 
 function available(date,staff,start,dur){
-  let buf=Number(localStorage.getItem("yp_buf_v23")||localStorage.getItem("yp_buf_v25")||15);
+  let buf=getBuffer();
   let end=add(start,dur+buf);
   const h=getHours(date);
   if(toMin(start)<toMin(h.open)||toMin(end)>toMin(h.close))return false;
@@ -440,7 +541,7 @@ function calcSlots(){
     return;
   }
 
-  let count=0,buf=Number(localStorage.getItem("yp_buf_v23")||15);
+  let count=0,buf=getBuffer();
   const biz=getHours(date);
 
   for(let m=toMin(biz.open);m<=toMin(biz.close)-dur-buf;m+=15){
@@ -672,7 +773,7 @@ function renderAdmin(){
 function renderTimeline(items){
   if(!document.getElementById("timelineBox")) return;
 
-  const breakMin = Number(localStorage.getItem("yp_buf_v23")||localStorage.getItem("yp_buf_v25")||localStorage.getItem("yp_break_v04")||15);
+  const breakMin = getBuffer();
 
   if(!items.length){
     timelineBox.innerHTML = `<p class="muted">這天目前沒有行程。</p>`;
@@ -812,8 +913,9 @@ function del(id){
 }
 
 function save休息時間(){
-  localStorage.setItem("yp_buf_v23",breakTime.value);
+  saveBuffer(breakTime.value);
   renderAdmin();
+  alert("已儲存休息時間");
 }
 
 init();
