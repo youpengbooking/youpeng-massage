@@ -386,9 +386,11 @@ function syncBookingCache(list){
 }
 
 function fitsBusinessHours(date,start,dur){
+  const h=getHours(date);
+  if(h.closed) return false;
+
   const buf=getBuffer();
   const end=add(start,dur+buf);
-  const h=getHours(date);
   return !(toMin(start)<toMin(h.open)||toMin(end)>toMin(h.close));
 }
 
@@ -780,6 +782,11 @@ async function init(){
   manualDate.value=today();
   manualDate.min=today();
 
+  if(document.getElementById("closedDateInput")){
+    closedDateInput.value=today();
+    closedDateInput.min=today();
+  }
+
   if(!localStorage.getItem(BUFFER_KEY)){
     localStorage.setItem(BUFFER_KEY,"15");
   }
@@ -904,21 +911,64 @@ function renderHoursStatus(){
   if(!document.getElementById("hoursStatus")) return;
   const d = adminDate.value || today();
   const h = getHours(d);
+
+  if(document.getElementById("closedDateInput")){
+    closedDateInput.value = d;
+  }
+
+  if(h.closed){
+    hoursStatus.innerHTML = `<b>${d}</b><br><b>店休</b><br>本日不開放線上預約。`;
+    return;
+  }
+
   hoursStatus.innerHTML = `<b>${d}</b><br>${h.label}<br>可預約時間：${h.open}～${h.close}`;
 }
 
 function setNormalHours(){
   const d = adminDate.value || today();
   saveHours(d, {open:"10:00", close:"22:00", label:"正常營業"});
+  clearSlots();
   renderHoursStatus();
   renderAdmin();
   alert("已恢復正常營業時間");
+}
+
+function setClosedDay(){
+  const input = document.getElementById("closedDateInput");
+  const d = (input && input.value) || adminDate.value || today();
+
+  if(!d){
+    alert("請選擇店休日期");
+    return;
+  }
+
+  const items = bookings().filter(b=>b.date===d);
+
+  if(items.length){
+    const ok = confirm(`這天目前已有 ${items.length} 筆行程。\n設定店休只會阻擋新的線上預約，不會自動取消既有行程。\n確定要將 ${d} 設為店休嗎？`);
+    if(!ok) return;
+  }else{
+    const ok = confirm(`確定將 ${d} 設為店休一整天嗎？`);
+    if(!ok) return;
+  }
+
+  saveHours(d, {open:"10:00", close:"10:00", closed:true, label:"店休"});
+
+  if(document.getElementById("adminDate")){
+    adminDate.value = d;
+  }
+
+  clearSlots();
+  renderHoursStatus();
+  renderAdmin();
+  alert("已設定店休。客人端這天將不開放預約。");
 }
 
 function setEarlyClose(){
   const d = adminDate.value || today();
   const close = earlyCloseTime.value || "18:00";
   saveHours(d, {open:"10:00", close, label:"提早打烊"});
+  clearSlots();
   renderHoursStatus();
   renderAdmin();
   alert("已設定提早打烊");
@@ -928,6 +978,7 @@ function setLateClose(){
   const d = adminDate.value || today();
   const close = lateCloseTime.value || "23:00";
   saveHours(d, {open:"10:00", close, label:"延後打烊"});
+  clearSlots();
   renderHoursStatus();
   renderAdmin();
   alert("已設定延後打烊");
@@ -951,6 +1002,13 @@ function calcSlots(){
   totalBox.classList.remove("hidden");
   slotTitle.classList.remove("hidden");
 
+  const biz=getHours(date);
+
+  if(biz.closed){
+    slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這天店休，暫不開放線上預約。若有特殊需求，請直接致電店內。</div>`;
+    return;
+  }
+
   let cands=st==="any"?["boss","lady"].filter(x=>can(x,ss)):(can(st,ss)?[st]:[]);
 
   if(!cands.length){
@@ -959,7 +1017,6 @@ function calcSlots(){
   }
 
   let count=0,buf=getBuffer();
-  const biz=getHours(date);
 
   for(let m=toMin(biz.open);m<=toMin(biz.close)-dur-buf;m+=15){
     let t=toTime(m);
@@ -1208,11 +1265,14 @@ function renderAdmin(){
   let items=bookings().filter(b=>b.date===d).sort((a,b)=>a.start.localeCompare(b.start));
 
   renderAdminSummary(items);
-  renderTimeline(items);
+  renderTimeline(items, d);
   renderRevenue(d, items);
 
   if(!items.length){
-    adminList.innerHTML="<p class='muted'>這天目前沒有預約。</p>";
+    const h = getHours(d);
+    adminList.innerHTML = h.closed
+      ? "<p class='muted'>這天為店休，目前沒有行程。</p>"
+      : "<p class='muted'>這天目前沒有預約。</p>";
     return;
   }
 
@@ -1244,13 +1304,17 @@ function renderAdmin(){
   });
 }
 
-function renderTimeline(items){
+function renderTimeline(items, date){
   if(!document.getElementById("timelineBox")) return;
 
+  const d = date || adminDate.value || today();
+  const h = getHours(d);
   const breakMin = getBuffer();
 
   if(!items.length){
-    timelineBox.innerHTML = `<p class="muted">這天目前沒有行程。</p>`;
+    timelineBox.innerHTML = h.closed
+      ? `<p class="muted">這天為店休，沒有行程。</p>`
+      : `<p class="muted">這天目前沒有行程。</p>`;
     return;
   }
 
