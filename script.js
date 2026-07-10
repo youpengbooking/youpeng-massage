@@ -1,6 +1,6 @@
 // ===============================
 // Firebase / Firestore 設定
-// 目前第六階段：LINE 通知接入
+// 正式版：LINE 通知＋店休取消修正
 // ===============================
 
 const firebaseConfig = {
@@ -387,7 +387,7 @@ function syncBookingCache(list){
 
 function fitsBusinessHours(date,start,dur){
   const h=getHours(date);
-  if(h.closed) return false;
+  if(h.closed === true) return false;
 
   const buf=getBuffer();
   const end=add(start,dur+buf);
@@ -898,7 +898,15 @@ function getHours(date){
 
 function saveHours(date, data){
   hoursCache = hoursCache && typeof hoursCache === "object" && !Array.isArray(hoursCache) ? hoursCache : {};
-  hoursCache[date] = data;
+
+  const nextData = {
+    open: data.open || "10:00",
+    close: data.close || "22:00",
+    label: data.label || "正常營業",
+    closed: data.closed === true
+  };
+
+  hoursCache[date] = nextData;
   localStorage.setItem(HOURS_KEY, JSON.stringify(hoursCache));
 
   if(db && fb.setDoc){
@@ -922,7 +930,7 @@ function renderHoursStatus(){
     closedDateInput.value = d;
   }
 
-  if(h.closed){
+  if(h.closed === true){
     hoursStatus.innerHTML = `<b>${d}</b><br><b>店休</b><br>本日不開放線上預約。`;
     return;
   }
@@ -932,7 +940,7 @@ function renderHoursStatus(){
 
 function setNormalHours(){
   const d = adminDate.value || today();
-  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業"});
+  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業", closed:false});
   clearSlots();
   renderHoursStatus();
   renderAdmin();
@@ -981,7 +989,7 @@ function cancelClosedDay(){
 
   const h = getHours(d);
 
-  if(!h.closed){
+  if(h.closed !== true){
     const ok = confirm(`${d} 目前不是店休日。\n是否仍要將這天恢復為正常營業 10:00～22:00？`);
     if(!ok) return;
   }else{
@@ -989,7 +997,7 @@ function cancelClosedDay(){
     if(!ok) return;
   }
 
-  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業"});
+  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業", closed:false});
 
   if(document.getElementById("adminDate")){
     adminDate.value = d;
@@ -1004,7 +1012,7 @@ function cancelClosedDay(){
 function setEarlyClose(){
   const d = adminDate.value || today();
   const close = earlyCloseTime.value || "18:00";
-  saveHours(d, {open:"10:00", close, label:"提早打烊"});
+  saveHours(d, {open:"10:00", close, label:"提早打烊", closed:false});
   clearSlots();
   renderHoursStatus();
   renderAdmin();
@@ -1014,7 +1022,7 @@ function setEarlyClose(){
 function setLateClose(){
   const d = adminDate.value || today();
   const close = lateCloseTime.value || "23:00";
-  saveHours(d, {open:"10:00", close, label:"延後打烊"});
+  saveHours(d, {open:"10:00", close, label:"延後打烊", closed:false});
   clearSlots();
   renderHoursStatus();
   renderAdmin();
@@ -1041,7 +1049,7 @@ function calcSlots(){
 
   const biz=getHours(date);
 
-  if(biz.closed){
+  if(biz.closed === true){
     slots.innerHTML=`<div class="notice" style="grid-column:1/-1">這天店休，暫不開放線上預約。若有特殊需求，請直接致電店內。</div>`;
     return;
   }
@@ -1307,7 +1315,7 @@ function renderAdmin(){
 
   if(!items.length){
     const h = getHours(d);
-    adminList.innerHTML = h.closed
+    adminList.innerHTML = h.closed === true
       ? "<p class='muted'>這天為店休，目前沒有行程。</p>"
       : "<p class='muted'>這天目前沒有預約。</p>";
     return;
@@ -1349,7 +1357,7 @@ function renderTimeline(items, date){
   const breakMin = getBuffer();
 
   if(!items.length){
-    timelineBox.innerHTML = h.closed
+    timelineBox.innerHTML = h.closed === true
       ? `<p class="muted">這天為店休，沒有行程。</p>`
       : `<p class="muted">這天目前沒有行程。</p>`;
     return;
