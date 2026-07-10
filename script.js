@@ -787,6 +787,12 @@ async function init(){
     closedDateInput.min=today();
   }
 
+  const setClosedBtn = document.getElementById("setClosedDayBtn");
+  if(setClosedBtn) setClosedBtn.onclick = setClosedDay;
+
+  const cancelClosedBtn = document.getElementById("cancelClosedDayBtn");
+  if(cancelClosedBtn) cancelClosedBtn.onclick = cancelClosedDay;
+
   if(!localStorage.getItem(BUFFER_KEY)){
     localStorage.setItem(BUFFER_KEY,"15");
   }
@@ -1494,5 +1500,9 @@ function save休息時間(){
   renderAdmin();
   alert("已儲存休息時間");
 }
+
+window.setClosedDay = setClosedDay;
+window.cancelClosedDay = cancelClosedDay;
+window.setNormalHours = setNormalHours;
 
 init();
