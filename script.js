@@ -26,7 +26,7 @@ let isSubmittingBooking = false;
 let editingBookingId = "";
 let editingOriginalPhone = "";
 
-const ADMIN_PASS_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+const ADMIN_PASS_HASH = "a6c0ae12c4791c1898caaf99c7bad8f37051102bb79a16ee1f44b1ec1a79d3fc";
 
 function loadLocalBookings(){
   try{
