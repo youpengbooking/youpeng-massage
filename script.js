@@ -964,6 +964,37 @@ function setClosedDay(){
   alert("已設定店休。客人端這天將不開放預約。");
 }
 
+function cancelClosedDay(){
+  const input = document.getElementById("closedDateInput");
+  const d = (input && input.value) || adminDate.value || today();
+
+  if(!d){
+    alert("請選擇要取消店休的日期");
+    return;
+  }
+
+  const h = getHours(d);
+
+  if(!h.closed){
+    const ok = confirm(`${d} 目前不是店休日。\n是否仍要將這天恢復為正常營業 10:00～22:00？`);
+    if(!ok) return;
+  }else{
+    const ok = confirm(`確定取消 ${d} 的店休，恢復正常營業 10:00～22:00 嗎？`);
+    if(!ok) return;
+  }
+
+  saveHours(d, {open:"10:00", close:"22:00", label:"正常營業"});
+
+  if(document.getElementById("adminDate")){
+    adminDate.value = d;
+  }
+
+  clearSlots();
+  renderHoursStatus();
+  renderAdmin();
+  alert("已取消店休，這天已恢復正常營業。");
+}
+
 function setEarlyClose(){
   const d = adminDate.value || today();
   const close = earlyCloseTime.value || "18:00";
